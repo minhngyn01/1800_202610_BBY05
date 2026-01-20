@@ -67,6 +67,8 @@ elmo-hikes/
 
 ## Contributors
 - **Harshpal Singh** - BCIT CST Student with a passion for outdoor adventures and user-friendly applications. Fun fact: Loves Playing PC games that are more story oriented.
+- **Amit Kahlon** - BCIT CST Student who is new to programming. Fun Fact: I enjoy playing video games
+- **Minh Nguyen** - BCIT CST Student who enjoys gaming, hiking, skiing and bedrotting.
 - **Teammate Name** - BCIT CST Student, Frontend enthusiast with a knack for creative design. Fun fact: Has a collection of over 50 houseplants.
 
 ---
