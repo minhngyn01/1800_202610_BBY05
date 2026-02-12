@@ -1,1 +1,114 @@
 
+/*
+* --------------------------------------------------
+* Custom styles overriding Bootstrap defaults
+* --------------------------------------------------
+*
+* Design principles applied:
+*
+* 1) 20/80 Rule
+*    A small number of targeted changes (colours on key
+*    components like buttons, navbar, and backgrounds)
+*    create most of the visual impact without rewriting
+*    Bootstrap’s core styles.
+*
+* 2) 60 / 30 / 10 Colour Rule
+*    - 60% dominant: lighter for backgrounds and large surfaces
+*    - 30% primary/secondary: primary for main actions, secondary for supporting elements
+*    - 10% accent: used sparingly for hover or emphasis
+*/
+
+/* --------------------------------------------------
+* Theme colours (CSS variables)
+* --------------------------------------------------
+*
+* Store as variables for reuse and maintainability. 
+*/
+:root {
+    /* 60% — background */
+    --light-text: #FEFEE3;
+
+    /* 30% — primary actions and supporting surfaces) */
+    --primary: #2C6E49;
+    --secondary: #4C956C;
+
+    /* 10% — accent for emphasis and interaction */
+    --accent: #D68C45;
+
+    /* Button border widths */
+    --btn-border-width: 3px;
+    --btn-border-width-hover: 5px;
+}
+
+/* --------------------------------------------------
+* Base page styles
+* --------------------------------------------------
+*
+* The dominant (60%) colour establishes a clean canvas for the page.
+*/
+body {
+    background-color: var(--light-text);
+    color: var(--primary);
+}
+
+/* --------------------------------------------------
+* Bootstrap utility class: .bg-info
+* --------------------------------------------------
+*
+* Overriding .bg-info applies the secondary (30%) colour used in navbar.
+* This small change creates a major visual shift, demonstrating the 20/80 rule.
+*
+* !important is used because Bootstrap utility classes
+* are designed to take priority.
+*/
+.bg-info {
+    background-color: var(--secondary) !important;
+}
+
+/* --------------------------------------------------
+* Navbar (.navbar-light - text colour on light background)
+* --------------------------------------------------
+*
+* If the navbar is using .bg-info, we want the text complement it.
+*/
+.navbar-light .navbar-brand,
+.navbar-light .navbar-nav .nav-link {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/*
+* Accent colour is introduced only on hover and focus on navbar elements,
+* keeping it within the 10% usage range.
+*/
+.navbar-light .navbar-nav .nav-link:hover,
+.navbar-light .navbar-nav .nav-link:focus {
+    color: var(--accent);
+}
+
+/* --------------------------------------------------
+* Button: .btn-info
+* --------------------------------------------------
+*  
+* Uses secondary (30%) color used in the call-to-action buttons, 
+* with a border to add visual interest without overwhelming the design.
+*/
+.btn-info {
+    color: var(--light-text);
+    background-color: var(--secondary);
+    border-color: var(--primary);
+    border-width: var(--btn-border-width);
+}
+
+/*
+* OPTIONAL: Hover/focus for desktop users - progressive enhancement
+* A thicker accent-colored border adds visual feedback without 
+* changing the button's core color scheme.
+*/
+.btn-info:hover,
+.btn-info:focus {
+    background-color: var(--secondary);
+    border-color: var(--accent);
+    border-width: var(--btn-border-width-hover);
+}
+
