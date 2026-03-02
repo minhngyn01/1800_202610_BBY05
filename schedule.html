@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Schedule - FIFA Itinerary</title>
+  <meta name="comp1800 template" content="My 1800 App">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/style.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="index.html">Itinerary</a>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+          <li class="nav-item">
+            <a class="nav-link active" aria-current="page" href="schedule.html">Schedule</a>
+          </li>
+          <li class="nav-item"><a class="nav-link" href="recommendations.html">Recommendations</a></li>
+        </ul>
+
+        <a href="login.html" class="btn btn-outline-success">Login</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="p-5 mb-4 bg-light rounded-3">
+    <div class="container-fluid py-4">
+      <h1 class="display-6 fw-bold">My Vancouver Schedule</h1>
+      <p class="fs-5 mb-0">Plan your day in advance, then get recommendations based on your area/time.</p>
+      <p id="msg" class="mt-2 mb-0"></p>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div class="container pb-4" style="max-width: 900px;">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Add a Schedule Item</h5>
+
+        <div class="row g-3 mt-1">
+          <div class="col-md-3">
+            <label class="form-label">Date</label>
+            <input id="date" type="date" class="form-control">
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Start</label>
+            <input id="startTime" type="time" class="form-control">
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">End</label>
+            <input id="endTime" type="time" class="form-control">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Area</label>
+            <select id="area" class="form-select">
+              <option value="Downtown" selected>Downtown</option>
+              <option value="Kitsilano">Kitsilano</option>
+              <option value="UBC">UBC</option>
+              <option value="North Vancouver">North Vancouver</option>
+              <option value="Richmond">Richmond</option>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Type</label>
+            <select id="type" class="form-select">
+              <option value="Explore" selected>Explore</option>
+              <option value="Eat">Eat</option>
+              <option value="Match">Match</option>
+              <option value="Travel">Travel</option>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Title</label>
+            <input id="title" class="form-control" placeholder="e.g., Visit Stanley Park, Dinner with friends, Watch match">
+          </div>
+
+          <div class="col-12 d-flex gap-2 flex-wrap">
+            <button id="btnAdd" class="btn btn-primary" type="button">Add to Schedule</button>
+            <button id="btnClear" class="btn btn-outline-secondary" type="button">Clear Form</button>
+            <button id="btnClearAll" class="btn btn-outline-danger" type="button">Clear All Schedule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DAY SELECT + RECOMMENDATIONS -->
+    <div class="d-flex justify-content-between align-items-end mt-4 flex-wrap gap-2">
+      <div>
+        <label class="form-label mb-1">View schedule for date</label>
+        <input id="viewDate" type="date" class="form-control" style="max-width: 220px;">
+      </div>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <button id="btnRecs" class="btn btn-success" type="button">
+          Get Recommendations for this Day
+        </button>
+      </div>
+    </div>
+
+    <!-- LIST -->
+    <div class="mt-3">
+      <h5 class="fw-bold mb-2">Schedule Items</h5>
+      <div id="scheduleList" class="row g-3"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="border-top py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <p class="mb-0 text-muted">&copy; 2026 FIFA Itinerary Planner</p>
+      <div class="d-flex gap-4">
+        <span class="material-icons">favorite</span>
+        <span class="material-icons">home</span>
+        <span class="material-icons">map</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="/src/schedulePlanner.js"></script>
+</body>
+</html>
