@@ -4,14 +4,14 @@ import { initializeApp } from "firebase/app";
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDES1T6ePb5E0nzmocTic2xUyNLP0INJdI",
-  authDomain: "fifa-itinerary.firebaseapp.com",
-  projectId: "fifa-itinerary",
-  storageBucket: "fifa-itinerary.firebasestorage.app",
-  messagingSenderId: "925526956776",
-  appId: "1:925526956776:web:049b9a5885feda249d075d"
-};
 
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGEBUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_SENDER_ID,
+};
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
