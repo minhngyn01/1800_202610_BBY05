@@ -12,6 +12,7 @@ const titleEl = document.getElementById("title");
 const btnAdd = document.getElementById("btnAdd");
 const btnClear = document.getElementById("btnClear");
 const btnClearAll = document.getElementById("btnClearAll");
+const btnRandom = document.getElementById("btnRandom");
 
 const viewDateEl = document.getElementById("viewDate");
 const btnRecs = document.getElementById("btnRecs");
@@ -151,6 +152,61 @@ function getDominantAreaForDate(date) {
   return best;
 }
 
+function randomPopulate() {
+
+  const activities = [
+    { title: "Visit Stanley Park", type: "Explore" },
+    { title: "Explore Granville Island", type: "Explore" },
+    { title: "Walk the Seawall", type: "Explore" },
+    { title: "Visit Vancouver Art Gallery", type: "Explore" },
+
+    { title: "Lunch Downtown", type: "Eat" },
+    { title: "Coffee Break", type: "Eat" },
+    { title: "Dinner Downtown", type: "Eat" },
+
+    { title: "Watch World Cup Match", type: "Match" },
+
+    { title: "SkyTrain Ride", type: "Travel" }
+  ];
+
+  const areas = ["Downtown", "Kitsilano", "UBC", "North Vancouver", "Richmond"];
+  const date = viewDateEl.value || todayISO();
+
+  let items = getItems();
+
+  let currentHour = 9; // start day at 9am
+
+  for (let i = 0; i < 5; i++) {
+
+    let activity = activities[Math.floor(Math.random() * activities.length)];
+
+    let duration = Math.floor(Math.random() * 2) + 1; // 1–2 hours
+
+    let start = String(currentHour).padStart(2, "0") + ":00";
+    let end = String(currentHour + duration).padStart(2, "0") + ":00";
+
+    const item = {
+      id: crypto.randomUUID(),
+      date: date,
+      start: start,
+      end: end,
+      area: areas[Math.floor(Math.random() * areas.length)],
+      type: activity.type,
+      title: activity.title,
+      createdAt: Date.now()
+    };
+
+    items.push(item);
+
+    currentHour += duration; // move time forward
+  }
+
+  setItems(items);
+
+  showMessage("Random schedule generated!");
+  renderForDate(date);
+}
+
 // Events
 btnAdd.addEventListener("click", addItem);
 btnClear.addEventListener("click", () => {
@@ -163,6 +219,8 @@ btnClearAll.addEventListener("click", () => {
   renderForDate(viewDateEl.value || todayISO());
 });
 
+btnRandom.addEventListener("click", randomPopulate);
+
 viewDateEl.addEventListener("change", () => {
   renderForDate(viewDateEl.value);
 });
@@ -174,6 +232,7 @@ btnRecs.addEventListener("click", () => {
   // Open recommendations filtered by this date+area
   window.location.href = `recommendations.html?date=${encodeURIComponent(date)}&area=${encodeURIComponent(area)}`;
 });
+
 
 // Init defaults
 viewDateEl.value = todayISO();
