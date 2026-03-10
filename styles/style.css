@@ -105,3 +105,27 @@ body {
 footer {
   margin-top: auto; /* pushes footer to bottom */
 }
+.card-img-top{
+  height:200px;
+  object-fit:cover;
+}
+.btn-outline-primary:hover{
+  background:#5ce1e6;
+  border-color:#5ce1e6;
+  color:#0b132b;
+}
+.btn{
+  border-radius: 8px;
+  font-weight: 500;
+}
+.card{
+  border: none;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover{
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
