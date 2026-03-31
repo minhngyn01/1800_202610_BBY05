@@ -1,4 +1,5 @@
 // src/schedulePlanner.js
+import { renderWeather } from "/src/weather.js";
 
 // ─── DOM Elements ─────────────────────────────────────────────────────────────
 
@@ -10,7 +11,8 @@ const endEl        = document.getElementById("endTime");
 const areaEl       = document.getElementById("area");
 const typeEl       = document.getElementById("type");
 const titleEl      = document.getElementById("title");
-const viewDateEl   = document.getElementById("viewDate");
+const viewDateEl      = document.getElementById("viewDate");
+const weatherWidget   = document.getElementById("weatherWidget");
 
 // HTML templates defined in schedule.html
 const tmplItem  = document.getElementById("tmpl-item");
@@ -280,6 +282,7 @@ document.getElementById("btnRandom").addEventListener("click", randomPopulate);
 viewDateEl.addEventListener("change", () => {
   dateEl.value = viewDateEl.value;
   renderForDate(viewDateEl.value);
+  renderWeather(weatherWidget, viewDateEl.value); // Update weather for selected date
 });
 
 // Build the URL with schedule context and navigate to the recommendations page
@@ -307,3 +310,4 @@ document.getElementById("btnRecs").addEventListener("click", () => {
 viewDateEl.value = todayISO();
 clearForm();
 renderForDate(viewDateEl.value);
+renderWeather(weatherWidget, viewDateEl.value); // Load weather on page load

@@ -22,12 +22,13 @@
           <li class="nav-item"><a class="nav-link active" aria-current="page" href="schedule.html">Schedule</a></li>
           <li class="nav-item"><a class="nav-link" href="recommendations.html">Recommendations</a></li>
         </ul>
+        <button id="btnDarkMode" class="btn btn-outline-secondary btn-sm me-2">🌙</button>
         <a href="login.html" class="btn btn-outline-success">Login</a>
       </div>
     </div>
   </nav>
 
-  <div class="p-5 mb-4 bg-light rounded-3">
+  <div class="p-5 mb-4 bg-body-tertiary rounded-3">
     <div class="container-fluid py-4">
       <h1 class="display-6 fw-bold">My Vancouver Schedule</h1>
       <p class="fs-5 mb-0">Plan your day in advance, then get recommendations based on your area/time.</p>
@@ -36,6 +37,10 @@
   </div>
 
   <div class="container pb-4" style="max-width:900px;">
+
+    <!-- Weather widget - updates when view date changes -->
+    <div id="weatherWidget" class="mb-4"></div>
+
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title">Add a Schedule Item</h5>
@@ -136,6 +141,7 @@
   </template>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script type="module" src="/src/darkMode.js"></script>
   <script type="module" src="/src/schedulePlanner.js"></script>
 </body>
 </html>
