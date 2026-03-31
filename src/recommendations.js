@@ -1,4 +1,5 @@
 // src/recommendations.js
+import { renderWeather } from "/src/weather.js";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ const btnFavoritesOnly = document.getElementById("btnFavoritesOnly");
 const msg              = document.getElementById("msg");
 const tmplRec          = document.getElementById("tmpl-rec");
 const tmplNoResults    = document.getElementById("tmpl-no-results");
+const weatherWidget    = document.getElementById("weatherWidget");
 
 let favoritesOnly = false;
 
@@ -275,6 +277,7 @@ function applyURLParams() {
       banner += ` · Showing: ${category === "Eat" ? "Restaurants" : "Places to Explore"} you haven't planned yet`;
     msg.className   = "mt-3 text-info fw-semibold";
     msg.textContent = banner;
+    renderWeather(weatherWidget, date); // Show forecast for the schedule date
   }
 }
 
