@@ -1,5 +1,6 @@
 // src/recommendations.js
 import { renderWeather } from "/src/weather.js";
+import "/src/backToTop.js";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 

@@ -1,9 +1,10 @@
 // src/schedulePlanner.js
 import { renderWeather } from "/src/weather.js";
+import "/src/backToTop.js";
 
 // ─── DOM Elements ─────────────────────────────────────────────────────────────
 
-const msg          = document.getElementById("msg");
+
 const scheduleList = document.getElementById("scheduleList");
 const dateEl       = document.getElementById("date");
 const startEl      = document.getElementById("startTime");
@@ -56,10 +57,14 @@ function toMins(timeStr) {
 
 // Shows a success (green) or error (red) message that auto-clears after 4s
 function showMessage(text, ok = true) {
-  msg.className   = ok ? "mt-2 text-success fw-semibold" : "mt-2 text-danger fw-semibold";
-  msg.textContent = text;
-  clearTimeout(msg._t);
-  msg._t = setTimeout(() => { msg.textContent = ""; }, 4000);
+  const toastEl = document.getElementById("toast");
+  const toastMsg = document.getElementById("toastMsg");
+
+  toastEl.classList.remove("text-bg-success", "text-bg-danger");
+  toastEl.classList.add(ok ? "text-bg-success" : "text-bg-danger");
+  toastMsg.textContent = text;
+
+  bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 }).show();
 }
 
 // ─── Form ─────────────────────────────────────────────────────────────────────
