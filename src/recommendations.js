@@ -1,49 +1,120 @@
-/**
- * recommendations.js
- *
- * Changes from original:
- * - Recommendation data is now loaded from Firestore "recommendations" collection
- *   instead of being hardcoded in the JS file.
- * - Favorites are saved to / read from Firestore per user (localStorage fallback for guests).
- * - Weather widget loads based on ?date= query param (passed from schedule page).
- * - All filter/search logic preserved from original.
- */
+// src/recommendations.js
+import { renderWeather } from "/src/weather.js";
+import "/src/backToTop.js";
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore,
-  collection, doc, setDoc, deleteDoc, getDoc, getDocs,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getAuth, onAuthStateChanged,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig } from "./firebaseConfig.js";
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
-const app  = initializeApp(firebaseConfig);
-const db   = getFirestore(app);
-const auth = getAuth(app);
+const recs = [
+  {
+    id: "stanley-park", type: "Explore", name: "Stanley Park", area: "Downtown",
+    desc: "Seawall, beaches, forest trails, scenic views.",
+    tags: ["park", "seawall", "views", "nature"], img: "images/stanleypark.jpg"
+  },
+  {
+    id: "granville-island", type: "Explore", name: "Granville Island Public Market", area: "Kitsilano",
+    desc: "Public market, shops, and food stalls.",
+    tags: ["market", "food", "shops"], img: "images/gran.jpg"
+  },
+  {
+    id: "science-world", type: "Explore", name: "Science World", area: "Downtown",
+    desc: "Interactive science exhibits and shows.",
+    tags: ["museum", "family", "indoor"], img: "images/scienceworld.jpg"
+  },
+  {
+    id: "vandusen", type: "Explore", name: "VanDusen Botanical Garden", area: "Kitsilano",
+    desc: "Large botanical garden with seasonal displays.",
+    tags: ["garden", "nature", "photos"], img: "images/vangarden.jpg"
+  },
+  {
+    id: "moa", type: "Explore", name: "Museum of Anthropology (MOA)", area: "UBC",
+    desc: "Iconic museum focused on world arts and cultures.",
+    tags: ["museum", "culture", "ubc"], img: "images/museum.jpg"
+  },
+  {
+    id: "grouse-mountain", type: "Explore", name: "Grouse Mountain", area: "North Vancouver",
+    desc: "Mountain views and outdoor activities.",
+    tags: ["mountain", "views", "hike"], img: "images/grouse.jpg"
+  },
+  {
+    id: "capilano", type: "Explore", name: "Capilano Suspension Bridge", area: "North Vancouver",
+    desc: "Suspension bridge and treetop walk.",
+    tags: ["bridge", "views", "forest"], img: "images/capilano.jpg"
+  },
+  {
+    id: "steveston", type: "Explore", name: "Steveston Village (Richmond)", area: "Richmond",
+    desc: "Fishing village vibes and waterfront stroll.",
+    tags: ["village", "seafood", "waterfront"], img: "images/steveston.jpg"
+  },
+  {
+    id: "miku", type: "Eat", name: "Miku Restaurant", area: "Downtown",
+    desc: "Popular for sushi/oshi style and waterfront dining.",
+    tags: ["sushi", "japanese", "seafood"], vegetarian: true, img: "images/miku.jpg"
+  },
+  {
+    id: "blue-water", type: "Eat", name: "Blue Water Cafe", area: "Downtown",
+    desc: "Well-known seafood spot in Yaletown.",
+    tags: ["seafood", "yaletown"], vegetarian: false, img: "images/bluecafe.jpg"
+  },
+  {
+    id: "elisa", type: "Eat", name: "Elisa Steakhouse", area: "Downtown",
+    desc: "Modern steakhouse in Yaletown.",
+    tags: ["steak", "yaletown"], vegetarian: false, img: "images/elisasteak.jpg"
+  },
+  {
+    id: "raminami", type: "Eat", name: "Minami Restaurant", area: "Downtown",
+    desc: "Japanese dining in Yaletown.",
+    tags: ["japanese", "sushi", "yaletown"], vegetarian: true, img: "images/minami.jpg"
+  },
+  {
+    id: "ramen-danbo", type: "Eat", name: "Ramen Danbo (Robson)", area: "Downtown",
+    desc: "Top rated ramen place.",
+    tags: ["ramen", "japanese"], vegetarian: true, img: "images/ramen.jpg"
+  },
+];
 
-// ── State ──────────────────────────────────────────────────────────────────
+// ─── DOM Elements ─────────────────────────────────────────────────────────────
 
-let allRecs    = [];
-let favorites  = new Set();
-let currentUser = null;
+const recsList         = document.getElementById("recsList");
+const categoryFilter   = document.getElementById("categoryFilter");
+const areaFilter       = document.getElementById("areaFilter");
+const searchBox        = document.getElementById("searchBox");
+const vegFilter        = document.getElementById("vegFilter");
+const btnClear         = document.getElementById("btnClear");
+const btnFavoritesOnly = document.getElementById("btnFavoritesOnly");
+const msg              = document.getElementById("msg");
+const tmplRec          = document.getElementById("tmpl-rec");
+const tmplNoResults    = document.getElementById("tmpl-no-results");
+const weatherWidget    = document.getElementById("weatherWidget");
 
-// ── Load recommendations from Firestore ────────────────────────────────────
+let favoritesOnly = false;
 
-async function loadRecommendations() {
-  try {
-    const snap = await getDocs(collection(db, "recommendations"));
-    if (!snap.empty) {
-      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    }
-  } catch (e) {
-    // Firestore read failed (rules, offline, etc.) — fall through to defaults
-    console.warn("Could not load recommendations from Firestore, using defaults.", e);
-  }
-  // Always return defaults if Firestore is empty or unavailable.
-  // An admin can seed Firestore manually; guests always see this data.
-  return getDefaultRecommendations();
+// ─── Storage Helpers ──────────────────────────────────────────────────────────
+// scheduleItems is shared with schedulePlanner.js via localStorage
+
+function getScheduleItems() {
+  try { return JSON.parse(localStorage.getItem("scheduleItems") || "[]"); }
+  catch { return []; }
+}
+function setScheduleItems(items) { localStorage.setItem("scheduleItems", JSON.stringify(items)); }
+
+function getFavorites() {
+  try { return JSON.parse(localStorage.getItem("favorites") || "[]"); }
+  catch { return []; }
+}
+function setFavorites(ids) { localStorage.setItem("favorites", JSON.stringify(ids)); }
+
+// ─── Utility Helpers ──────────────────────────────────────────────────────────
+
+function todayISO() { return new Date().toISOString().split("T")[0]; }
+
+// Converts "HH:MM" to total minutes for overlap comparison
+function toMinutes(timeStr) {
+  const [h, m] = timeStr.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function buildMapsLink(name) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ", Vancouver BC")}`;
 }
 
 // ── Load / save favorites ──────────────────────────────────────────────────

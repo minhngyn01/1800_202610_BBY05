@@ -1,32 +1,32 @@
-/**
- * schedulePlanner.js
- *
- * Changes from original:
- * - Schedule items now persist to Firestore (per-user) instead of only localStorage
- * - Multi-day range view: toggle between single-day and date-range views
- * - Edit support: each card has an Edit button that reveals an inline edit form
- * - localStorage still used as fallback when user is not logged in
- */
+// src/schedulePlanner.js
+import { renderWeather } from "/src/weather.js";
+import "/src/backToTop.js";
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore, collection, doc, setDoc, deleteDoc,
-  getDocs, query, where, orderBy
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig } from "./firebaseConfig.js";
+// ─── DOM Elements ─────────────────────────────────────────────────────────────
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+const scheduleList = document.getElementById("scheduleList");
+const dateEl       = document.getElementById("date");
+const startEl      = document.getElementById("startTime");
+const endEl        = document.getElementById("endTime");
+const areaEl       = document.getElementById("area");
+const typeEl       = document.getElementById("type");
+const titleEl      = document.getElementById("title");
+const viewDateEl      = document.getElementById("viewDate");
+const weatherWidget   = document.getElementById("weatherWidget");
 
-const BADGE_COLORS = {
-  Explore: "bg-primary",
-  Eat:     "bg-success",
-  Match:   "bg-danger",
-  Travel:  "bg-warning text-dark",
+// HTML templates defined in schedule.html
+const tmplItem  = document.getElementById("tmpl-item");
+const tmplEmpty = document.getElementById("tmpl-empty");
+
+// ─── Badge Colors ─────────────────────────────────────────────────────────────
+// Maps each activity type to a Bootstrap badge color class
+
+const BADGE = {
+  Eat:    "text-bg-success",
+  Explore:"text-bg-info",
+  Match:  "text-bg-warning",
+  Travel: "text-bg-secondary"
 };
 
 function formatTime(t) {
@@ -53,13 +53,16 @@ function showToast(msg, type = "bg-success") {
 
 let currentUser = null;
 
-async function loadItems() {
-  if (currentUser) {
-    const ref = collection(db, "users", currentUser.uid, "scheduleItems");
-    const snap = await getDocs(query(ref, orderBy("date"), orderBy("startTime")));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  }
-  return JSON.parse(localStorage.getItem("scheduleItems") || "[]");
+// Shows a success (green) or error (red) message that auto-clears after 4s
+function showMessage(text, ok = true) {
+  const toastEl = document.getElementById("toast");
+  const toastMsg = document.getElementById("toastMsg");
+
+  toastEl.classList.remove("text-bg-success", "text-bg-danger");
+  toastEl.classList.add(ok ? "text-bg-success" : "text-bg-danger");
+  toastMsg.textContent = text;
+
+  bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 }).show();
 }
 
 async function saveItem(item) {
