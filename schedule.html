@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <title>Schedule - FIFA Itinerary</title>
   <meta charset="utf-8">
@@ -9,9 +8,9 @@
   <link rel="stylesheet" href="/styles/style.css">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
-
 <body>
 
+  <!-- NAVBAR -->
   <nav class="navbar navbar-expand-lg bg-body-tertiary">
     <div class="container-fluid">
       <a class="navbar-brand" href="index.html">Itinerary</a>
@@ -29,23 +28,24 @@
         <a href="login.html" class="btn btn-outline-success">Login</a>
       </div>
     </div>
-  </div>
-</nav>
+  </nav>
 
+  <!-- HERO -->
   <div class="p-5 mb-4 bg-body-tertiary rounded-3">
     <div class="container-fluid py-4">
       <h1 class="display-6 fw-bold">My Vancouver Schedule</h1>
       <p class="fs-5 mb-0">Plan your day in advance, then get recommendations based on your area/time.</p>
-      
+      <p id="msg" class="mt-2 mb-0"></p>
     </div>
   </div>
-</div>
 
-<div class="container pb-4" style="max-width:900px;">
+  <!-- MAIN CONTENT -->
+  <div class="container pb-4" style="max-width:900px;">
 
-  <!-- Weather widget -->
-  <div id="weatherWidget" class="mb-4"></div>
+    <!-- Weather widget -->
+    <div id="weatherWidget" class="mb-4"></div>
 
+    <!-- Add item form -->
     <div class="card shadow-sm">
       <div class="card-body">
         <h5 class="card-title">Add a Schedule Item</h5>
@@ -83,8 +83,7 @@
           </div>
           <div class="col-12">
             <label class="form-label">Title</label>
-            <input id="title" class="form-control"
-              placeholder="e.g., Visit Stanley Park, Dinner with friends, Watch match">
+            <input id="title" class="form-control" placeholder="e.g., Visit Stanley Park, Dinner with friends, Watch match">
           </div>
           <div class="col-12 d-flex gap-2 flex-wrap">
             <button id="btnAdd" class="btn btn-primary" type="button">Add to Schedule</button>
@@ -93,188 +92,147 @@
             <button id="btnRandom" class="btn btn-primary" type="button">Randomly Populate Schedule</button>
           </div>
         </div>
-        <div class="col-md-2">
-          <label class="form-label">End</label>
-          <input id="endTime" type="time" class="form-control">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Area</label>
-          <select id="area" class="form-select">
-            <option value="Downtown" selected>Downtown</option>
-            <option value="Kitsilano">Kitsilano</option>
-            <option value="UBC">UBC</option>
-            <option value="North Vancouver">North Vancouver</option>
-            <option value="Richmond">Richmond</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label">Type</label>
-          <select id="type" class="form-select">
-            <option value="Explore" selected>Explore</option>
-            <option value="Eat">Eat</option>
-            <option value="Match">Match</option>
-            <option value="Travel">Travel</option>
-          </select>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Title</label>
-          <input id="title" class="form-control"
-            placeholder="e.g., Visit Stanley Park, Dinner with friends, Watch match">
-        </div>
-        <div class="col-12 d-flex gap-2 flex-wrap">
-          <button id="btnAdd" class="btn btn-primary" type="button">Add to Schedule</button>
-          <button id="btnClear" class="btn btn-outline-secondary" type="button">Clear Form</button>
-          <button id="btnClearAll" class="btn btn-outline-danger" type="button">Clear All Schedule</button>
-          <button id="btnRandom" class="btn btn-primary" type="button">Randomly Populate Schedule</button>
-        </div>
       </div>
     </div>
+
+    <!-- View controls: single day vs date range -->
+    <div class="mt-4">
+      <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
+        <div class="btn-group" role="group" aria-label="View mode">
+          <input type="radio" class="btn-check" name="viewMode" id="modeSingle" value="single" checked>
+          <label class="btn btn-outline-secondary" for="modeSingle">Single Day</label>
+          <input type="radio" class="btn-check" name="viewMode" id="modeRange" value="range">
+          <label class="btn btn-outline-secondary" for="modeRange">Date Range</label>
+        </div>
+      </div>
+
+      <!-- Single day picker -->
+      <div id="singleDayPicker" class="d-flex justify-content-between align-items-end flex-wrap gap-2">
+        <div>
+          <label class="form-label mb-1">View schedule for date</label>
+          <input id="viewDate" type="date" class="form-control" style="max-width:220px;">
+        </div>
+        <button id="btnRecs" class="btn btn-success" type="button">Get Recommendations for this Day</button>
+      </div>
+
+      <!-- Date range picker (hidden by default) -->
+      <div id="rangePicker" style="display:none;" class="d-flex align-items-end gap-3 flex-wrap">
+        <div>
+          <label class="form-label mb-1">From</label>
+          <input id="rangeStart" type="date" class="form-control" style="max-width:200px;">
+        </div>
+        <div>
+          <label class="form-label mb-1">To</label>
+          <input id="rangeEnd" type="date" class="form-control" style="max-width:200px;">
+        </div>
+        <button id="btnApplyRange" class="btn btn-primary" type="button">Apply Range</button>
+      </div>
+    </div>
+
+    <!-- Schedule list -->
+    <div class="mt-3">
+      <h5 class="fw-bold mb-2">Schedule Items</h5>
+      <div id="scheduleList" class="row g-3"></div>
+    </div>
+
   </div>
 
-  <!-- View controls: single day vs multi-day range -->
-  <div class="mt-4">
-    <div class="d-flex align-items-center gap-3 flex-wrap mb-3">
-      <div class="btn-group" role="group" aria-label="View mode">
-        <input type="radio" class="btn-check" name="viewMode" id="modeSingle" value="single" checked>
-        <label class="btn btn-outline-secondary" for="modeSingle">Single Day</label>
-        <input type="radio" class="btn-check" name="viewMode" id="modeRange" value="range">
-        <label class="btn btn-outline-secondary" for="modeRange">Date Range</label>
+  <!-- FOOTER -->
+  <footer class="border-top py-3">
+    <div class="container d-flex justify-content-between align-items-center">
+      <p class="mb-0 text-muted">&copy; 2026 FIFA Itinerary Planner</p>
+      <div class="d-flex gap-4">
+        <span class="material-icons">favorite</span>
+        <span class="material-icons">home</span>
+        <span class="material-icons">map</span>
       </div>
     </div>
+  </footer>
 
-    <!-- Single day picker -->
-    <div id="singleDayPicker" class="d-flex justify-content-between align-items-end flex-wrap gap-2">
-      <div>
-        <label class="form-label mb-1">View schedule for date</label>
-        <input id="viewDate" type="date" class="form-control" style="max-width:220px;">
-      </div>
-      <button id="btnRecs" class="btn btn-success" type="button">Get Recommendations for this Day</button>
-    </div>
-
-    <!-- Date range picker (hidden by default) -->
-    <div id="rangePicker" style="display:none;" class="d-flex align-items-end gap-3 flex-wrap">
-      <div>
-        <label class="form-label mb-1">From</label>
-        <input id="rangeStart" type="date" class="form-control" style="max-width:200px;">
-      </div>
-      <div>
-        <label class="form-label mb-1">To</label>
-        <input id="rangeEnd" type="date" class="form-control" style="max-width:200px;">
-      </div>
-      <button id="btnApplyRange" class="btn btn-primary" type="button">Apply Range</button>
-    </div>
-  </div>
-
-  <!-- Schedule list -->
-  <div class="mt-3">
-    <h5 class="fw-bold mb-2">Schedule Items</h5>
-    <div id="scheduleList" class="row g-3"></div>
-  </div>
-</div>
-
-<footer class="border-top py-3">
-  <div class="container d-flex justify-content-between align-items-center">
-    <p class="mb-0 text-muted">&copy; 2026 FIFA Itinerary Planner</p>
-    <div class="d-flex gap-4">
-      <span class="material-icons">favorite</span>
-      <span class="material-icons">home</span>
-      <span class="material-icons">map</span>
-    </div>
-  </div>
-</footer>
-
-<!-- Template: schedule item card -->
-<template id="tmpl-item">
-  <div class="col-12">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <!-- View mode -->
-        <div class="t-view d-flex justify-content-between align-items-start gap-3 flex-wrap">
-          <div>
-            <div class="d-flex gap-2 align-items-center flex-wrap">
-              <span class="t-badge badge"></span>
-              <span class="t-title fw-bold"></span>
+  <!-- Template: schedule item card -->
+  <template id="tmpl-item">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <!-- View mode -->
+          <div class="t-view d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <div class="d-flex gap-2 align-items-center flex-wrap">
+                <span class="t-badge badge"></span>
+                <span class="t-title fw-bold"></span>
+              </div>
+              <div class="t-meta text-muted mt-1 small"></div>
             </div>
-            <div class="t-meta text-muted mt-1 small"></div>
+            <div class="d-flex gap-2">
+              <button class="t-edit btn btn-outline-secondary btn-sm">Edit</button>
+              <button class="t-delete btn btn-outline-danger btn-sm">Delete</button>
+            </div>
           </div>
-          <div class="d-flex gap-2">
-            <button class="t-edit btn btn-outline-secondary btn-sm">Edit</button>
-            <button class="t-delete btn btn-outline-danger btn-sm">Delete</button>
-          </div>
-        </div>
-        <!-- Edit mode (hidden by default) -->
-        <div class="t-edit-form" style="display:none;">
-          <div class="row g-2">
-            <div class="col-md-3">
-              <label class="form-label small">Date</label>
-              <input type="date" class="form-control form-control-sm t-edit-date">
-            </div>
-            <div class="col-md-2">
-              <label class="form-label small">Start</label>
-              <input type="time" class="form-control form-control-sm t-edit-start">
-            </div>
-            <div class="col-md-2">
-              <label class="form-label small">End</label>
-              <input type="time" class="form-control form-control-sm t-edit-end">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label small">Area</label>
-              <select class="form-select form-select-sm t-edit-area">
-                <option value="Downtown">Downtown</option>
-                <option value="Kitsilano">Kitsilano</option>
-                <option value="UBC">UBC</option>
-                <option value="North Vancouver">North Vancouver</option>
-                <option value="Richmond">Richmond</option>
-              </select>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label small">Type</label>
-              <select class="form-select form-select-sm t-edit-type">
-                <option value="Explore">Explore</option>
-                <option value="Eat">Eat</option>
-                <option value="Match">Match</option>
-                <option value="Travel">Travel</option>
-              </select>
-            </div>
-            <div class="col-12">
-              <label class="form-label small">Title</label>
-              <input type="text" class="form-control form-control-sm t-edit-title">
-            </div>
-            <div class="col-12 d-flex gap-2">
-              <button class="t-save btn btn-primary btn-sm">Save</button>
-              <button class="t-cancel btn btn-outline-secondary btn-sm">Cancel</button>
+          <!-- Edit mode (hidden by default) -->
+          <div class="t-edit-form" style="display:none;">
+            <div class="row g-2">
+              <div class="col-md-3">
+                <label class="form-label small">Date</label>
+                <input type="date" class="form-control form-control-sm t-edit-date">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">Start</label>
+                <input type="time" class="form-control form-control-sm t-edit-start">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">End</label>
+                <input type="time" class="form-control form-control-sm t-edit-end">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Area</label>
+                <select class="form-select form-select-sm t-edit-area">
+                  <option value="Downtown">Downtown</option>
+                  <option value="Kitsilano">Kitsilano</option>
+                  <option value="UBC">UBC</option>
+                  <option value="North Vancouver">North Vancouver</option>
+                  <option value="Richmond">Richmond</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small">Type</label>
+                <select class="form-select form-select-sm t-edit-type">
+                  <option value="Explore">Explore</option>
+                  <option value="Eat">Eat</option>
+                  <option value="Match">Match</option>
+                  <option value="Travel">Travel</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label small">Title</label>
+                <input type="text" class="form-control form-control-sm t-edit-title">
+              </div>
+              <div class="col-12 d-flex gap-2">
+                <button class="t-save btn btn-primary btn-sm">Save</button>
+                <button class="t-cancel btn btn-outline-secondary btn-sm">Cancel</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-</template>
-
-<!-- Template: day header (for multi-day view) -->
-<template id="tmpl-day-header">
-  <div class="col-12 mt-3">
-    <h6 class="t-day-label fw-bold text-muted border-bottom pb-1 mb-0"></h6>
-  </div>
-</template>
-
-<!-- Template: empty state -->
-<template id="tmpl-empty">
-  <div class="col-12">
-    <div class="t-msg alert mb-0"></div>
-  </div>
-</template>
-
-<!-- Toast Notification -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 9999">
-  <div id="toast" class="toast align-items-center border-0" role="alert">
-    <div class="d-flex">
-      <div class="toast-body fw-semibold" id="toastMsg"></div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
     </div>
   </template>
-  <!-- Toast Notification -->
-  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 9999">
+
+  <!-- Template: day header (for multi-day range view) -->
+  <template id="tmpl-day-header">
+    <div class="col-12 mt-3">
+      <h6 class="t-day-label fw-bold text-muted border-bottom pb-1 mb-0"></h6>
+    </div>
+  </template>
+
+  <!-- Template: empty state -->
+  <template id="tmpl-empty">
+    <div class="col-12">
+      <div class="t-msg alert mb-0"></div>
+    </div>
+  </template>
+
+  <!-- Toast notification -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999;">
     <div id="toast" class="toast align-items-center border-0" role="alert">
       <div class="d-flex">
         <div class="toast-body fw-semibold" id="toastMsg"></div>
@@ -282,15 +240,15 @@
       </div>
     </div>
   </div>
-  <!-- Back to Top Button -->
-<button id="backToTop" class="btn btn-primary rounded-circle shadow" 
-  style="position:fixed;bottom:80px;right:24px;width:44px;height:44px;display:none;z-index:9998;">
-  <span class="material-icons" style="font-size:20px;line-height:1;">arrow_upward</span>
-</button>
+
+  <!-- Back to top button -->
+  <button id="backToTop" class="btn btn-primary rounded-circle shadow"
+    style="position:fixed;bottom:80px;right:24px;width:44px;height:44px;display:none;z-index:9998;">
+    <span class="material-icons" style="font-size:20px;line-height:1;">arrow_upward</span>
+  </button>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script type="module" src="/src/darkMode.js"></script>
   <script type="module" src="/src/schedulePlanner.js"></script>
-  
 </body>
-
 </html>

@@ -1,6 +1,10 @@
 // src/recommendations.js
+import { db, auth }      from "/src/firebaseConfig.js";
 import { renderWeather } from "/src/weather.js";
-import "/src/backToTop.js";
+import {
+  collection, doc, setDoc, deleteDoc, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -87,424 +91,231 @@ const tmplNoResults    = document.getElementById("tmpl-no-results");
 const weatherWidget    = document.getElementById("weatherWidget");
 
 let favoritesOnly = false;
+let currentUser   = null;
+let favIds        = new Set(); // Cached favorite IDs for current user
 
-// ─── Storage Helpers ──────────────────────────────────────────────────────────
-// scheduleItems is shared with schedulePlanner.js via localStorage
+// ─── Favorites (Firestore + localStorage fallback) ────────────────────────────
 
-function getScheduleItems() {
+async function loadFavIds() {
+  if (currentUser) {
+    const snap = await getDocs(collection(db, "users", currentUser.uid, "favorites"));
+    favIds = new Set(snap.docs.map(d => d.id));
+  } else {
+    try { favIds = new Set(JSON.parse(localStorage.getItem("favorites") || "[]")); }
+    catch { favIds = new Set(); }
+  }
+}
+
+async function toggleFavorite(id) {
+  const isFav = favIds.has(id);
+  if (currentUser) {
+    const ref = doc(db, "users", currentUser.uid, "favorites", id);
+    if (isFav) await deleteDoc(ref);
+    else await setDoc(ref, { id, savedAt: Date.now() });
+  } else {
+    isFav ? favIds.delete(id) : favIds.add(id);
+    localStorage.setItem("favorites", JSON.stringify([...favIds]));
+  }
+  isFav ? favIds.delete(id) : favIds.add(id);
+}
+
+// ─── Schedule helpers ─────────────────────────────────────────────────────────
+
+async function getScheduleItems() {
+  if (currentUser) {
+    const snap = await getDocs(collection(db, "users", currentUser.uid, "scheduleItems"));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
   try { return JSON.parse(localStorage.getItem("scheduleItems") || "[]"); }
   catch { return []; }
 }
-function setScheduleItems(items) { localStorage.setItem("scheduleItems", JSON.stringify(items)); }
 
-function getFavorites() {
-  try { return JSON.parse(localStorage.getItem("favorites") || "[]"); }
-  catch { return []; }
-}
-function setFavorites(ids) { localStorage.setItem("favorites", JSON.stringify(ids)); }
-
-// ─── Utility Helpers ──────────────────────────────────────────────────────────
-
-function todayISO() { return new Date().toISOString().split("T")[0]; }
-
-// Converts "HH:MM" to total minutes for overlap comparison
-function toMinutes(timeStr) {
-  const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function buildMapsLink(name) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ", Vancouver BC")}`;
-}
-
-// ── Load / save favorites ──────────────────────────────────────────────────
-
-async function loadFavorites(user) {
-  if (user) {
-    const snap = await getDocs(collection(db, "users", user.uid, "favorites"));
-    return new Set(snap.docs.map(d => d.id));
-  }
-  return new Set(JSON.parse(localStorage.getItem("favoriteIds") || "[]"));
-}
-
-async function toggleFavorite(user, rec) {
-  const isFav = favorites.has(rec.id);
-  if (user) {
-    const ref = doc(db, "users", user.uid, "favorites", rec.id);
-    if (isFav) {
-      await deleteDoc(ref);
-    } else {
-      await setDoc(ref, rec);
-    }
+async function saveScheduleItem(item) {
+  if (currentUser) {
+    await setDoc(doc(db, "users", currentUser.uid, "scheduleItems", item.id), item);
   } else {
-    const ids = JSON.parse(localStorage.getItem("favoriteIds") || "[]");
-    const updated = isFav ? ids.filter(i => i !== rec.id) : [...ids, rec.id];
-    localStorage.setItem("favoriteIds", JSON.stringify(updated));
-    // Also store full rec data for guest favorites page
-    const stored = JSON.parse(localStorage.getItem("favorites") || "[]");
-    const updatedFull = isFav
-      ? stored.filter(r => r.id !== rec.id)
-      : [...stored, rec];
-    localStorage.setItem("favorites", JSON.stringify(updatedFull));
-  }
-  if (isFav) favorites.delete(rec.id); else favorites.add(rec.id);
-}
-
-// ── Add to schedule ────────────────────────────────────────────────────────
-
-async function addToSchedule(user, rec, date, startTime, endTime, type) {
-  const item = {
-    id:        crypto.randomUUID(),
-    date,
-    startTime,
-    endTime,
-    area:      rec.area,
-    type,
-    title:     rec.name,
-  };
-  if (user) {
-    await setDoc(doc(db, "users", user.uid, "scheduleItems", item.id), item);
-  } else {
-    const items = JSON.parse(localStorage.getItem("scheduleItems") || "[]");
+    const items = await getScheduleItems();
     items.push(item);
     localStorage.setItem("scheduleItems", JSON.stringify(items));
   }
 }
 
-// ── Render ─────────────────────────────────────────────────────────────────
+function todayISO() { return new Date().toISOString().split("T")[0]; }
+function toMinutes(t) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
+function buildMapsLink(name) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ", Vancouver BC")}`;
+}
 
-const BADGE_COLORS = {
-  Explore: "bg-primary",
-  Eat:     "bg-success",
-  Match:   "bg-danger",
-  Travel:  "bg-warning text-dark",
-};
+async function scheduleHasOverlap(date, start, end) {
+  const items = await getScheduleItems();
+  const ns = toMinutes(start), ne = toMinutes(end);
+  return items.some(item =>
+    item.date === date && ns < toMinutes(item.end) && ne > toMinutes(item.start)
+  );
+}
 
-function renderRecs(recs) {
-  const list = document.getElementById("recsList");
-  list.innerHTML = "";
+async function addToSchedule(placeName, placeArea, formEl) {
+  const date    = formEl.querySelector(".t-ats-date").value;
+  const start   = formEl.querySelector(".t-ats-start").value;
+  const end     = formEl.querySelector(".t-ats-end").value;
+  const type    = formEl.querySelector(".t-ats-type").value;
+  const errorEl = formEl.querySelector(".t-ats-err");
 
-  if (recs.length === 0) {
-    const tmpl  = document.getElementById("tmpl-no-results");
-    list.appendChild(tmpl.content.cloneNode(true));
+  if (!date)          { errorEl.textContent = "Pick a date."; return; }
+  if (!start || !end) { errorEl.textContent = "Set a start and end time."; return; }
+  if (end <= start)   { errorEl.textContent = "End time must be after start."; return; }
+  if (await scheduleHasOverlap(date, start, end)) {
+    errorEl.textContent = "Overlaps an existing schedule item."; return;
+  }
+
+  await saveScheduleItem({
+    id: crypto.randomUUID(), date, start, end,
+    area: placeArea, type, title: placeName, createdAt: Date.now()
+  });
+  formEl.innerHTML = `<div class="alert alert-success py-2 mb-0 small">✓ Added for ${date}! <a href="schedule.html" class="alert-link ms-1">View schedule →</a></div>`;
+}
+
+// ─── Filtering ────────────────────────────────────────────────────────────────
+
+function matchesFilters(rec) {
+  const query        = (searchBox.value || "").trim().toLowerCase();
+  const searchTarget = `${rec.name} ${rec.desc} ${rec.area} ${rec.tags.join(" ")}`.toLowerCase();
+  return (categoryFilter.value === "All" || rec.type === categoryFilter.value) &&
+         (areaFilter.value === "All"     || rec.area === areaFilter.value) &&
+         (!query                         || searchTarget.includes(query)) &&
+         (!favoritesOnly                 || favIds.has(rec.id)) &&
+         (!vegFilter.checked             || rec.vegetarian === true);
+}
+
+// ─── Rendering ────────────────────────────────────────────────────────────────
+
+function render() {
+  const filteredRecs = recs.filter(matchesFilters);
+  recsList.innerHTML = "";
+
+  if (!filteredRecs.length) {
+    recsList.appendChild(tmplNoResults.content.cloneNode(true));
     return;
   }
 
-  recs.forEach(rec => {
-    const tmpl  = document.getElementById("tmpl-rec");
-    const clone = tmpl.content.cloneNode(true);
+  const today = todayISO();
+  for (const rec of filteredRecs) {
+    const card  = tmplRec.content.cloneNode(true);
+    const isFav = favIds.has(rec.id);
 
-    clone.querySelector(".t-img").src  = rec.image || "";
-    clone.querySelector(".t-img").alt  = rec.name  || "";
-    clone.querySelector(".t-name").textContent = rec.name || "";
-    clone.querySelector(".t-badge").className =
-      `t-badge badge ms-2 flex-shrink-0 ${BADGE_COLORS[rec.type] || "bg-secondary"}`;
-    clone.querySelector(".t-badge").textContent = rec.type || "";
-    clone.querySelector(".t-area").textContent  = rec.area || "";
-    clone.querySelector(".t-desc").textContent  = rec.description || "";
+    card.querySelector(".t-img").src          = rec.img;
+    card.querySelector(".t-img").alt          = rec.name;
+    card.querySelector(".t-name").textContent = rec.name;
+    card.querySelector(".t-area").textContent = `Area: ${rec.area}`;
+    card.querySelector(".t-desc").textContent = rec.desc;
+    card.querySelector(".t-maps").href        = buildMapsLink(rec.name);
+    card.querySelector(".t-fav").textContent  = isFav ? "Saved ✓" : "Save";
 
-    const mapsUrl = rec.mapsUrl ||
-      `https://www.google.com/maps/search/${encodeURIComponent(rec.name + " Vancouver")}`;
-    clone.querySelector(".t-maps").href = mapsUrl;
+    const badge = card.querySelector(".t-badge");
+    badge.textContent = rec.type;
+    badge.classList.add(rec.type === "Explore" ? "text-bg-info" : "text-bg-success");
 
-    // Favorite button
-    const favBtn = clone.querySelector(".t-fav");
-    const isFav  = favorites.has(rec.id);
-    favBtn.textContent = isFav ? "★ Saved" : "☆ Save";
-    favBtn.className   = `t-fav btn btn-sm ms-auto ${isFav ? "btn-warning" : "btn-outline-warning"}`;
-    favBtn.addEventListener("click", async () => {
-      await toggleFavorite(currentUser, rec);
-      const nowFav = favorites.has(rec.id);
-      favBtn.textContent = nowFav ? "★ Saved" : "☆ Save";
-      favBtn.className   = `t-fav btn btn-sm ms-auto ${nowFav ? "btn-warning" : "btn-outline-warning"}`;
-    });
+    const dateInput = card.querySelector(".t-ats-date");
+    dateInput.value = today; dateInput.min = today;
 
-    // Add to schedule toggle
-    const atsToggle  = clone.querySelector(".t-ats-toggle");
-    const atsForm    = clone.querySelector(".t-ats-form");
-    const atsConfirm = clone.querySelector(".t-ats-confirm");
-    const atsCancel  = clone.querySelector(".t-ats-cancel");
-    const atsErr     = clone.querySelector(".t-ats-err");
-
-    // Pre-fill date if coming from schedule page
-    const urlDate = new URLSearchParams(window.location.search).get("date");
-    if (urlDate) atsForm.querySelector(".t-ats-date").value = urlDate;
+    const atsForm   = card.querySelector(".t-ats-form");
+    const atsToggle = card.querySelector(".t-ats-toggle");
 
     atsToggle.addEventListener("click", () => {
-      atsForm.style.display = atsForm.style.display === "none" ? "" : "none";
+      const isOpen = atsForm.style.display === "block";
+      atsForm.style.display = isOpen ? "none" : "block";
+      atsToggle.textContent = isOpen ? "+ Schedule" : "✕ Cancel";
     });
-    atsCancel.addEventListener("click",  () => { atsForm.style.display = "none"; });
-    atsConfirm.addEventListener("click", async () => {
-      const date  = atsForm.querySelector(".t-ats-date").value;
-      const start = atsForm.querySelector(".t-ats-start").value;
-      const end   = atsForm.querySelector(".t-ats-end").value;
-      const type  = atsForm.querySelector(".t-ats-type").value;
-      if (!date) { atsErr.textContent = "Please pick a date."; return; }
-      await addToSchedule(currentUser, rec, date, start, end, type);
+    card.querySelector(".t-ats-cancel").addEventListener("click", () => {
       atsForm.style.display = "none";
-      atsErr.textContent    = "";
-      showToast(`"${rec.name}" added to schedule!`);
+      atsToggle.textContent = "+ Schedule";
+    });
+    card.querySelector(".t-ats-confirm").addEventListener("click", () => {
+      addToSchedule(rec.name, rec.area, atsForm);
     });
 
-    list.appendChild(clone);
+    card.querySelector(".t-fav").addEventListener("click", async () => {
+      await toggleFavorite(rec.id);
+      msg.className   = "mt-3 text-success";
+      msg.textContent = favIds.has(rec.id) ? "Added to favorites!" : "Removed from favorites!";
+      render();
+    });
+
+    recsList.appendChild(card);
+  }
+}
+
+// ─── Clear Filters ────────────────────────────────────────────────────────────
+
+function clearFilters() {
+  categoryFilter.value = "All"; areaFilter.value = "All";
+  searchBox.value = ""; vegFilter.checked = false;
+  favoritesOnly = false;
+  btnFavoritesOnly.classList.replace("btn-secondary", "btn-outline-secondary");
+  msg.textContent = "";
+  render();
+}
+
+// ─── URL Params ───────────────────────────────────────────────────────────────
+
+function applyURLParams() {
+  const params   = new URLSearchParams(window.location.search);
+  const area     = params.get("area");
+  const date     = params.get("date");
+  const category = params.get("category");
+  const covered  = params.get("covered");
+
+  if (area && area !== "All" && [...areaFilter.options].find(o => o.value === area))
+    areaFilter.value = area;
+  if (category && category !== "All" && [...categoryFilter.options].find(o => o.value === category))
+    categoryFilter.value = category;
+
+  if (date) {
+    const coveredList = covered ? covered.split(",").filter(Boolean) : [];
+    let banner = `Recommendations for your schedule on ${date}`;
+    if (area && area !== "All") banner += ` · Area: ${area}`;
+    if (coveredList.length)     banner += ` · Already planned: ${coveredList.join(", ")}`;
+    if (category && category !== "All")
+      banner += ` · Showing: ${category === "Eat" ? "Restaurants" : "Places to Explore"} you haven't planned yet`;
+    msg.className   = "mt-3 text-info fw-semibold";
+    msg.textContent = banner;
+    if (weatherWidget) renderWeather(weatherWidget, date);
+  }
+}
+
+// ─── Event Listeners ──────────────────────────────────────────────────────────
+
+categoryFilter.addEventListener("change", render);
+areaFilter.addEventListener("change", render);
+searchBox.addEventListener("input", render);
+vegFilter.addEventListener("change", render);
+btnClear.addEventListener("click", clearFilters);
+btnFavoritesOnly.addEventListener("click", () => {
+  favoritesOnly = !favoritesOnly;
+  btnFavoritesOnly.classList.toggle("btn-secondary", favoritesOnly);
+  btnFavoritesOnly.classList.toggle("btn-outline-secondary", !favoritesOnly);
+  msg.className   = "mt-3";
+  msg.textContent = favoritesOnly ? "Showing favorites only." : "";
+  render();
+});
+
+const backToTop = document.getElementById("backToTop");
+if (backToTop) {
+  window.addEventListener("scroll", () => {
+    backToTop.style.display = window.scrollY > 300 ? "flex" : "none";
   });
+  backToTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
 }
 
-function applyFilters() {
-  const category  = document.getElementById("categoryFilter").value;
-  const area      = document.getElementById("areaFilter").value;
-  const search    = document.getElementById("searchBox").value.toLowerCase();
-  const vegOnly   = document.getElementById("vegFilter").checked;
-  const favOnly   = document.getElementById("btnFavoritesOnly").classList.contains("active");
-
-  const filtered = allRecs.filter(r => {
-    if (category !== "All" && r.type !== category) return false;
-    if (area     !== "All" && r.area !== area)     return false;
-    if (vegOnly  && !r.vegetarian)                 return false;
-    if (favOnly  && !favorites.has(r.id))          return false;
-    if (search   && !r.name.toLowerCase().includes(search) &&
-                    !r.description?.toLowerCase().includes(search)) return false;
-    return true;
-  });
-
-  document.getElementById("msg").textContent =
-    filtered.length === allRecs.length ? "" : `Showing ${filtered.length} of ${allRecs.length} places`;
-
-  renderRecs(filtered);
-}
-
-// ── Weather widget ─────────────────────────────────────────────────────────
-
-async function loadWeather(dateStr) {
-  const widget = document.getElementById("weatherWidget");
-  if (!dateStr) { widget.innerHTML = ""; return; }
-  const today = new Date().toISOString().split("T")[0];
-  if (dateStr < today) { widget.innerHTML = ""; return; }
-
-  try {
-    const res  = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=49.2827&longitude=-123.1207` +
-      `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum` +
-      `&timezone=America%2FVancouver&start_date=${dateStr}&end_date=${dateStr}`
-    );
-    const data = await res.json();
-    if (!data.daily?.weathercode?.length) { widget.innerHTML = ""; return; }
-
-    const code = data.daily.weathercode[0];
-    const tMax = Math.round(data.daily.temperature_2m_max[0]);
-    const tMin = Math.round(data.daily.temperature_2m_min[0]);
-    const rain = data.daily.precipitation_sum[0];
-
-    const icons = {
-      0:"☀️",1:"🌤️",2:"⛅",3:"☁️",45:"🌫️",48:"🌫️",
-      51:"🌦️",53:"🌦️",55:"🌧️",61:"🌧️",63:"🌧️",65:"🌧️",
-      71:"🌨️",73:"🌨️",75:"🌨️",80:"🌦️",81:"🌧️",82:"⛈️",95:"⛈️",
-    };
-    const icon = icons[code] ?? "🌡️";
-    const d    = new Date(dateStr + "T00:00:00");
-    const label = d.toLocaleDateString("en-CA",
-      { weekday:"long", year:"numeric", month:"long", day:"numeric" });
-
-    widget.innerHTML = `
-      <div class="card shadow-sm">
-        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
-          <span style="font-size:2rem;">${icon}</span>
-          <div>
-            <strong>Vancouver Weather — ${label}</strong>
-            <div class="text-muted small">
-              High ${tMax}°C / Low ${tMin}°C · 
-              ${rain > 0 ? `${rain} mm precipitation` : "No precipitation expected"}
-            </div>
-          </div>
-        </div>
-      </div>`;
-  } catch { widget.innerHTML = ""; }
-}
-
-// ── Toast ──────────────────────────────────────────────────────────────────
-
-function showToast(msg) {
-  // Lightweight toast without a dedicated element — create on demand
-  const el = document.createElement("div");
-  el.className = "position-fixed bottom-0 end-0 m-3 alert alert-success shadow";
-  el.style.zIndex = "9999";
-  el.textContent  = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2500);
-}
-
-// ── Init ───────────────────────────────────────────────────────────────────
-
-// Load recommendations immediately — they are public and don't need auth.
-// Auth state resolves separately and refreshes favorite button states.
-(async () => {
-  allRecs = await loadRecommendations();
-  applyFilters();
-})();
+// ─── Auth State ───────────────────────────────────────────────────────────────
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
-  favorites = await loadFavorites(user);
-  // Re-render so favorite buttons reflect login state
-  if (allRecs.length > 0) applyFilters();
+  await loadFavIds();
+  render();
 });
 
-// Weather from ?date= param
-const urlDate = new URLSearchParams(window.location.search).get("date");
-if (urlDate) loadWeather(urlDate);
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
-// Filter listeners
-document.getElementById("categoryFilter").addEventListener("change", applyFilters);
-document.getElementById("areaFilter").addEventListener("change",    applyFilters);
-document.getElementById("searchBox").addEventListener("input",      applyFilters);
-document.getElementById("vegFilter").addEventListener("change",     applyFilters);
-
-document.getElementById("btnFavoritesOnly").addEventListener("click", (e) => {
-  e.currentTarget.classList.toggle("active");
-  applyFilters();
-});
-
-document.getElementById("btnClear").addEventListener("click", () => {
-  document.getElementById("categoryFilter").value = "All";
-  document.getElementById("areaFilter").value     = "All";
-  document.getElementById("searchBox").value      = "";
-  document.getElementById("vegFilter").checked    = false;
-  document.getElementById("btnFavoritesOnly").classList.remove("active");
-  applyFilters();
-});
-
-// Back to top
-window.addEventListener("scroll", () => {
-  document.getElementById("backToTop").style.display =
-    window.scrollY > 300 ? "flex" : "none";
-});
-document.getElementById("backToTop").addEventListener("click", () => {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
-
-// ── Default recommendations data (seeds Firestore on first load) ───────────
-
-function getDefaultRecommendations() {
-  return [
-    {
-      id: "stanley-park",
-      name: "Stanley Park",
-      type: "Explore",
-      area: "Downtown",
-      description: "A massive urban park with sea walls, forests, and stunning views of the harbour.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Stanley+Park,+Vancouver,+BC",
-    },
-    {
-      id: "granville-island",
-      name: "Granville Island Public Market",
-      type: "Explore",
-      area: "Kitsilano",
-      description: "A vibrant market with fresh produce, artisan goods, street food, and local vendors.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Granville+Island+Public+Market",
-    },
-    {
-      id: "capilano-bridge",
-      name: "Capilano Suspension Bridge",
-      type: "Explore",
-      area: "North Vancouver",
-      description: "Walk across a 137-metre suspension bridge over a breathtaking canyon and old-growth forest.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Capilano+Suspension+Bridge+Park",
-    },
-    {
-      id: "ubc-museum",
-      name: "UBC Museum of Anthropology",
-      type: "Explore",
-      area: "UBC",
-      description: "World-class collection of Northwest Coast First Nations art and culture.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Museum+of+Anthropology+at+UBC",
-    },
-    {
-      id: "richmond-night-market",
-      name: "Richmond Night Market",
-      type: "Eat",
-      area: "Richmond",
-      description: "North America's largest night market — hundreds of Asian street food stalls and entertainment.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Richmond+Night+Market",
-    },
-    {
-      id: "miku-restaurant",
-      name: "Miku Restaurant",
-      type: "Eat",
-      area: "Downtown",
-      description: "Upscale Japanese restaurant renowned for aburi (flame-seared) sushi on the waterfront.",
-      vegetarian: false,
-      image: "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Miku+Restaurant+Vancouver",
-    },
-    {
-      id: "naam-restaurant",
-      name: "The Naam",
-      type: "Eat",
-      area: "Kitsilano",
-      description: "Vancouver's oldest natural food restaurant — fully vegetarian, open 24 hours.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/The+Naam+Restaurant",
-    },
-    {
-      id: "canada-place",
-      name: "Canada Place",
-      type: "Explore",
-      area: "Downtown",
-      description: "Iconic sail-shaped convention and cruise ship terminal with panoramic harbour views.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Canada+Place",
-    },
-    {
-      id: "lonsdale-quay",
-      name: "Lonsdale Quay Market",
-      type: "Explore",
-      area: "North Vancouver",
-      description: "Waterfront public market with fresh food, boutique shops, and a SeaBus terminal.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Lonsdale+Quay+Market",
-    },
-    {
-      id: "vij-restaurant",
-      name: "Vij's Restaurant",
-      type: "Eat",
-      area: "Downtown",
-      description: "Award-winning modern Indian cuisine — one of Vancouver's most celebrated restaurants.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Vij%27s+Restaurant",
-    },
-    {
-      id: "ubc-botanical",
-      name: "UBC Botanical Garden",
-      type: "Explore",
-      area: "UBC",
-      description: "75 acres of themed gardens including Asian, Alpine, and the famous Nitobe Memorial Garden.",
-      vegetarian: true,
-      image: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/UBC+Botanical+Garden",
-    },
-    {
-      id: "steveston-village",
-      name: "Steveston Village",
-      type: "Explore",
-      area: "Richmond",
-      description: "Charming historic fishing village with fresh-off-the-boat seafood and heritage sites.",
-      vegetarian: false,
-      image: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&q=80",
-      mapsUrl: "https://www.google.com/maps/place/Steveston,+Richmond,+BC",
-    },
-  ];
-}
+applyURLParams();
+loadFavIds().then(render);
