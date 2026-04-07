@@ -1,26 +1,25 @@
 // src/schedulePlanner.js
+import { db, auth }      from "/src/firebaseConfig.js";
 import { renderWeather } from "/src/weather.js";
-import "/src/backToTop.js";
+import {
+  collection, doc, setDoc, deleteDoc, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ─── DOM Elements ─────────────────────────────────────────────────────────────
 
-
-const scheduleList = document.getElementById("scheduleList");
-const dateEl       = document.getElementById("date");
-const startEl      = document.getElementById("startTime");
-const endEl        = document.getElementById("endTime");
-const areaEl       = document.getElementById("area");
-const typeEl       = document.getElementById("type");
-const titleEl      = document.getElementById("title");
-const viewDateEl      = document.getElementById("viewDate");
-const weatherWidget   = document.getElementById("weatherWidget");
-
-// HTML templates defined in schedule.html
-const tmplItem  = document.getElementById("tmpl-item");
-const tmplEmpty = document.getElementById("tmpl-empty");
-
-// ─── Badge Colors ─────────────────────────────────────────────────────────────
-// Maps each activity type to a Bootstrap badge color class
+const msg           = document.getElementById("msg");
+const scheduleList  = document.getElementById("scheduleList");
+const dateEl        = document.getElementById("date");
+const startEl       = document.getElementById("startTime");
+const endEl         = document.getElementById("endTime");
+const areaEl        = document.getElementById("area");
+const typeEl        = document.getElementById("type");
+const titleEl       = document.getElementById("title");
+const viewDateEl    = document.getElementById("viewDate");
+const weatherWidget = document.getElementById("weatherWidget");
+const tmplItem      = document.getElementById("tmpl-item");
+const tmplEmpty     = document.getElementById("tmpl-empty");
 
 const BADGE = {
   Eat:    "text-bg-success",
@@ -29,49 +28,27 @@ const BADGE = {
   Travel: "text-bg-secondary"
 };
 
-function formatTime(t) {
-  if (!t) return "";
-  const [h, m] = t.split(":").map(Number);
-  const ampm = h >= 12 ? "PM" : "AM";
-  return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${ampm}`;
-}
+let currentUser = null; // Set by onAuthStateChanged
 
-function formatDateLabel(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-}
+// ─── Storage Helpers ──────────────────────────────────────────────────────────
+// Logged in → Firestore | Guest → localStorage
 
-function showToast(msg, type = "bg-success") {
-  const el = document.getElementById("toast");
-  const msgEl = document.getElementById("toastMsg");
-  el.className = `toast align-items-center text-white border-0 ${type}`;
-  msgEl.textContent = msg;
-  bootstrap.Toast.getOrCreateInstance(el, { delay: 2500 }).show();
-}
-
-// ── Storage: Firestore + localStorage fallback ─────────────────────────────
-
-let currentUser = null;
-
-// Shows a success (green) or error (red) message that auto-clears after 4s
-function showMessage(text, ok = true) {
-  const toastEl = document.getElementById("toast");
-  const toastMsg = document.getElementById("toastMsg");
-
-  toastEl.classList.remove("text-bg-success", "text-bg-danger");
-  toastEl.classList.add(ok ? "text-bg-success" : "text-bg-danger");
-  toastMsg.textContent = text;
-
-  bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 4000 }).show();
+async function getItems() {
+  if (currentUser) {
+    const snap = await getDocs(collection(db, "users", currentUser.uid, "scheduleItems"));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+  try { return JSON.parse(localStorage.getItem("scheduleItems") || "[]"); }
+  catch { return []; }
 }
 
 async function saveItem(item) {
   if (currentUser) {
     await setDoc(doc(db, "users", currentUser.uid, "scheduleItems", item.id), item);
   } else {
-    const items = JSON.parse(localStorage.getItem("scheduleItems") || "[]");
+    const items = await getItems();
     const idx = items.findIndex(i => i.id === item.id);
-    if (idx >= 0) items[idx] = item; else items.push(item);
+    if (idx !== -1) items[idx] = item; else items.push(item);
     localStorage.setItem("scheduleItems", JSON.stringify(items));
   }
 }
@@ -80,308 +57,285 @@ async function removeItem(id) {
   if (currentUser) {
     await deleteDoc(doc(db, "users", currentUser.uid, "scheduleItems", id));
   } else {
-    const items = JSON.parse(localStorage.getItem("scheduleItems") || "[]")
-      .filter(i => i.id !== id);
+    const items = (await getItems()).filter(i => i.id !== id);
     localStorage.setItem("scheduleItems", JSON.stringify(items));
   }
 }
 
-async function clearAll() {
-  if (currentUser) {
-    const ref = collection(db, "users", currentUser.uid, "scheduleItems");
-    const snap = await getDocs(ref);
-    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-  } else {
-    localStorage.removeItem("scheduleItems");
-  }
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
+function todayISO() { return new Date().toISOString().split("T")[0]; }
+function toMins(t) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
+
+function showMessage(text, ok = true) {
+  msg.className   = ok ? "mt-2 text-success fw-semibold" : "mt-2 text-danger fw-semibold";
+  msg.textContent = text;
+  clearTimeout(msg._t);
+  msg._t = setTimeout(() => { msg.textContent = ""; }, 4000);
 }
 
-// ── Rendering ──────────────────────────────────────────────────────────────
-
-function buildItemCard(item, onEdit, onDelete) {
-  const tmpl = document.getElementById("tmpl-item");
-  const clone = tmpl.content.cloneNode(true);
-  const col = clone.querySelector(".col-12");
-
-  // View mode
-  clone.querySelector(".t-badge").className =
-    `t-badge badge ${BADGE_COLORS[item.type] || "bg-secondary"}`;
-  clone.querySelector(".t-badge").textContent = item.type;
-  clone.querySelector(".t-title").textContent = item.title;
-  clone.querySelector(".t-meta").textContent =
-    `${item.area} · ${formatTime(item.startTime)}${item.endTime ? " – " + formatTime(item.endTime) : ""}`;
-
-  // Populate edit form with current values
-  clone.querySelector(".t-edit-date").value  = item.date;
-  clone.querySelector(".t-edit-start").value = item.startTime;
-  clone.querySelector(".t-edit-end").value   = item.endTime;
-  clone.querySelector(".t-edit-title").value = item.title;
-  clone.querySelector(".t-edit-area").value  = item.area;
-  clone.querySelector(".t-edit-type").value  = item.type;
-
-  // Toggle edit mode
-  clone.querySelector(".t-edit").addEventListener("click", () => {
-    col.querySelector(".t-view").style.display     = "none";
-    col.querySelector(".t-edit-form").style.display = "";
-  });
-  clone.querySelector(".t-cancel").addEventListener("click", () => {
-    col.querySelector(".t-view").style.display     = "";
-    col.querySelector(".t-edit-form").style.display = "none";
-  });
-
-  // Save edits
-  clone.querySelector(".t-save").addEventListener("click", async () => {
-    const updated = {
-      ...item,
-      date:      col.querySelector(".t-edit-date").value,
-      startTime: col.querySelector(".t-edit-start").value,
-      endTime:   col.querySelector(".t-edit-end").value,
-      title:     col.querySelector(".t-edit-title").value.trim(),
-      area:      col.querySelector(".t-edit-area").value,
-      type:      col.querySelector(".t-edit-type").value,
-    };
-    if (!updated.title || !updated.date) {
-      showToast("Title and date are required.", "bg-danger"); return;
-    }
-    await saveItem(updated);
-    onEdit();
-    showToast("Item updated.");
-  });
-
-  // Delete
-  clone.querySelector(".t-delete").addEventListener("click", async () => {
-    await removeItem(item.id);
-    onDelete();
-    showToast("Item removed.", "bg-secondary");
-  });
-
-  return clone;
+function clearForm() {
+  dateEl.value  = viewDateEl.value || todayISO();
+  startEl.value = "10:00"; endEl.value = "12:00";
+  areaEl.value  = "Downtown"; typeEl.value = "Explore";
+  titleEl.value = "";
 }
 
-async function renderList() {
-  const list   = document.getElementById("scheduleList");
-  const items  = await loadItems();
-  const mode   = document.querySelector('input[name="viewMode"]:checked')?.value || "single";
+function validate() {
+  if (!dateEl.value)                  return "Pick a date.";
+  if (!startEl.value || !endEl.value) return "Pick start and end time.";
+  if (endEl.value <= startEl.value)   return "End time must be after start.";
+  if (!titleEl.value.trim())          return "Enter a title.";
+  return null;
+}
 
-  let filtered = [];
+async function hasOverlap(date, start, end, excludeId = null) {
+  const items = await getItems();
+  const ns = toMins(start), ne = toMins(end);
+  return items.some(item =>
+    item.date === date && item.id !== excludeId &&
+    ns < toMins(item.end) && ne > toMins(item.start)
+  );
+}
 
-  if (mode === "single") {
-    const viewDate = document.getElementById("viewDate").value;
-    filtered = viewDate ? items.filter(i => i.date === viewDate) : items;
-  } else {
-    const start = document.getElementById("rangeStart").value;
-    const end   = document.getElementById("rangeEnd").value;
-    filtered = items.filter(i => (!start || i.date >= start) && (!end || i.date <= end));
+// ─── CRUD ─────────────────────────────────────────────────────────────────────
+
+async function addItem() {
+  const err = validate();
+  if (err) { showMessage(err, false); return; }
+  if (await hasOverlap(dateEl.value, startEl.value, endEl.value)) {
+    showMessage("Time overlaps an existing item.", false); return;
   }
+  const item = {
+    id: crypto.randomUUID(), date: dateEl.value, start: startEl.value,
+    end: endEl.value, area: areaEl.value, type: typeEl.value,
+    title: titleEl.value.trim(), createdAt: Date.now()
+  };
+  await saveItem(item);
+  showMessage(`"${item.title}" added!`);
+  viewDateEl.value = item.date;
+  await renderForDate(item.date);
+  titleEl.value = "";
+}
 
-  list.innerHTML = "";
+async function deleteItem(id) {
+  await removeItem(id);
+  showMessage("Item deleted.");
+  await renderForDate(viewDateEl.value || todayISO());
+}
 
-  if (filtered.length === 0) {
-    const tmpl  = document.getElementById("tmpl-empty");
-    const clone = tmpl.content.cloneNode(true);
-    clone.querySelector(".t-msg").className = "t-msg alert alert-info mb-0";
-    clone.querySelector(".t-msg").textContent = "No items found for this date range.";
-    list.appendChild(clone);
+async function saveEdit(id) {
+  const card     = scheduleList.querySelector(`[data-id="${id}"]`);
+  const editForm = card.querySelector(".t-edit-form");
+  const date     = editForm.querySelector(".t-edit-date").value;
+  const start    = editForm.querySelector(".t-edit-start").value;
+  const end      = editForm.querySelector(".t-edit-end").value;
+  const area     = editForm.querySelector(".t-edit-area").value;
+  const type     = editForm.querySelector(".t-edit-type").value;
+  const title    = editForm.querySelector(".t-edit-title").value.trim();
+  if (!date || !start || !end || !title) { showMessage("Fill in all fields.", false); return; }
+  if (end <= start) { showMessage("End must be after start.", false); return; }
+  if (await hasOverlap(date, start, end, id)) { showMessage("Time overlaps another item.", false); return; }
+  await saveItem({ id, date, start, end, area, type, title, createdAt: Date.now() });
+  showMessage(`"${title}" updated!`);
+  await renderForDate(viewDateEl.value || todayISO());
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+async function renderForDate(date) {
+  const items = (await getItems())
+    .filter(item => item.date === date)
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  scheduleList.innerHTML = "";
+
+  if (!date || !items.length) {
+    const clone = tmplEmpty.content.cloneNode(true);
+    const msgEl = clone.querySelector(".t-msg");
+    msgEl.classList.add(!date ? "alert-secondary" : "alert-info");
+    msgEl.textContent = !date ? "Select a date." : `No items for ${date}. Add one above.`;
+    scheduleList.appendChild(clone);
     return;
   }
 
-  if (mode === "range") {
-    // Group by date
-    const byDate = {};
-    filtered.forEach(item => {
-      (byDate[item.date] = byDate[item.date] || []).push(item);
+  for (const item of items) {
+    const clone  = tmplItem.content.cloneNode(true);
+    const colDiv = clone.querySelector(".col-12");
+    colDiv.dataset.id = item.id;
+
+    clone.querySelector(".t-badge").className  += ` ${BADGE[item.type] || "text-bg-secondary"}`;
+    clone.querySelector(".t-badge").textContent = item.type;
+    clone.querySelector(".t-title").textContent = item.title;
+    clone.querySelector(".t-meta").textContent  = `${item.date} • ${item.start}–${item.end} • ${item.area}`;
+
+    // Pre-fill edit form fields
+    clone.querySelector(".t-edit-date").value  = item.date;
+    clone.querySelector(".t-edit-start").value = item.start;
+    clone.querySelector(".t-edit-end").value   = item.end;
+    clone.querySelector(".t-edit-area").value  = item.area;
+    clone.querySelector(".t-edit-type").value  = item.type;
+    clone.querySelector(".t-edit-title").value = item.title;
+
+    const viewDiv  = clone.querySelector(".t-view");
+    const editForm = clone.querySelector(".t-edit-form");
+
+    clone.querySelector(".t-edit").addEventListener("click", () => {
+      viewDiv.style.display = "none";
+      editForm.style.display = "block";
     });
-    Object.keys(byDate).sort().forEach(date => {
-      // Day header
-      const hTmpl  = document.getElementById("tmpl-day-header");
-      const hClone = hTmpl.content.cloneNode(true);
-      hClone.querySelector(".t-day-label").textContent = formatDateLabel(date);
-      list.appendChild(hClone);
-      // Items for that day
-      byDate[date].forEach(item => {
-        list.appendChild(buildItemCard(item, renderList, renderList));
-      });
+    clone.querySelector(".t-cancel").addEventListener("click", () => {
+      viewDiv.style.display = "flex";
+      editForm.style.display = "none";
     });
-  } else {
-    filtered.forEach(item => {
-      list.appendChild(buildItemCard(item, renderList, renderList));
-    });
+    clone.querySelector(".t-save").addEventListener("click",   () => saveEdit(item.id));
+    clone.querySelector(".t-delete").addEventListener("click", () => deleteItem(item.id));
+    scheduleList.appendChild(clone);
   }
 }
 
-// ── Random populate ────────────────────────────────────────────────────────
+async function renderForRange(startDate, endDate) {
+  const allItems = (await getItems())
+    .filter(item => item.date >= startDate && item.date <= endDate)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
 
-const RANDOM_ITEMS = [
-  { title: "Stanley Park Walk",        area: "Downtown",       type: "Explore", startTime: "09:00", endTime: "11:00" },
-  { title: "Granville Island Market",  area: "Kitsilano",      type: "Explore", startTime: "11:30", endTime: "13:00" },
-  { title: "Lunch at The Naam",        area: "Kitsilano",      type: "Eat",     startTime: "13:00", endTime: "14:00" },
-  { title: "UBC Museum of Anthropology", area: "UBC",          type: "Explore", startTime: "14:30", endTime: "16:30" },
-  { title: "Dinner in Richmond",       area: "Richmond",       type: "Eat",     startTime: "18:00", endTime: "19:30" },
-  { title: "Canada Place Walk",        area: "Downtown",       type: "Explore", startTime: "10:00", endTime: "11:00" },
-  { title: "Lonsdale Quay",            area: "North Vancouver", type: "Explore", startTime: "13:00", endTime: "15:00" },
-  { title: "Robson Street Shopping",   area: "Downtown",       type: "Explore", startTime: "15:00", endTime: "17:00" },
-  { title: "Sushi at Miku",            area: "Downtown",       type: "Eat",     startTime: "19:00", endTime: "20:30" },
-  { title: "Watch FIFA Match",         area: "Downtown",       type: "Match",   startTime: "20:00", endTime: "22:00" },
-];
+  scheduleList.innerHTML = "";
 
-function getNextDays(n) {
-  const dates = [];
-  for (let i = 0; i < n; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().split("T")[0]);
+  if (!allItems.length) {
+    const clone = tmplEmpty.content.cloneNode(true);
+    const msgEl = clone.querySelector(".t-msg");
+    msgEl.classList.add("alert-info");
+    msgEl.textContent = `No items between ${startDate} and ${endDate}.`;
+    scheduleList.appendChild(clone);
+    return;
   }
-  return dates;
+
+  let lastDate = null;
+  for (const item of allItems) {
+    if (item.date !== lastDate) {
+      const header = document.getElementById("tmpl-day-header").content.cloneNode(true);
+      header.querySelector(".t-day-label").textContent =
+        new Date(item.date + "T12:00:00").toLocaleDateString("en-CA",
+          { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      scheduleList.appendChild(header);
+      lastDate = item.date;
+    }
+    const clone  = tmplItem.content.cloneNode(true);
+    const colDiv = clone.querySelector(".col-12");
+    colDiv.dataset.id = item.id;
+    clone.querySelector(".t-badge").className  += ` ${BADGE[item.type] || "text-bg-secondary"}`;
+    clone.querySelector(".t-badge").textContent = item.type;
+    clone.querySelector(".t-title").textContent = item.title;
+    clone.querySelector(".t-meta").textContent  = `${item.date} • ${item.start}–${item.end} • ${item.area}`;
+    clone.querySelector(".t-delete").addEventListener("click", () => deleteItem(item.id));
+    scheduleList.appendChild(clone);
+  }
 }
+
+// ─── Recommendations Context ──────────────────────────────────────────────────
+
+async function getScheduleContext(date) {
+  const items = (await getItems()).filter(item => item.date === date);
+  if (!items.length) return { area: "All", coveredTypes: [], suggestedCategory: "All", totalItems: 0 };
+  const counts = {};
+  for (const item of items) counts[item.area] = (counts[item.area] || 0) + 1;
+  const area = Object.entries(counts).reduce((b, [a, c]) => c > b[1] ? [a, c] : b, ["All", 0])[0];
+  const coveredTypes = [...new Set(items.map(i => i.type))];
+  const suggestedCategory = !coveredTypes.includes("Eat") ? "Eat"
+    : !coveredTypes.includes("Explore") ? "Explore" : "All";
+  return { area, coveredTypes, suggestedCategory, totalItems: items.length };
+}
+
+// ─── Random Populate ──────────────────────────────────────────────────────────
 
 async function randomPopulate() {
-  const dates = getNextDays(3);
-  const shuffled = [...RANDOM_ITEMS].sort(() => Math.random() - 0.5).slice(0, 6);
-  for (let i = 0; i < shuffled.length; i++) {
-    const item = {
-      ...shuffled[i],
-      id:   crypto.randomUUID(),
-      date: dates[i % dates.length],
-    };
-    await saveItem(item);
+  const activities = [
+    { title: "Visit Stanley Park",          type: "Explore" },
+    { title: "Explore Granville Island",    type: "Explore" },
+    { title: "Walk the Seawall",            type: "Explore" },
+    { title: "Visit Vancouver Art Gallery", type: "Explore" },
+    { title: "Lunch Downtown",              type: "Eat"     },
+    { title: "Coffee Break",               type: "Eat"     },
+    { title: "Dinner Downtown",             type: "Eat"     },
+    { title: "Watch World Cup Match",       type: "Match"   },
+    { title: "SkyTrain Ride",              type: "Travel"  },
+  ];
+  const areas = ["Downtown", "Kitsilano", "UBC", "North Vancouver", "Richmond"];
+  const date  = viewDateEl.value || todayISO();
+  let currentHour = 9, added = 0;
+
+  for (const act of [...activities].sort(() => Math.random() - 0.5)) {
+    if (added >= 5) break;
+    const dur     = Math.floor(Math.random() * 2) + 1;
+    const endHour = currentHour + dur;
+    if (endHour > 23) break;
+    const start = String(currentHour).padStart(2, "0") + ":00";
+    const end   = String(endHour).padStart(2, "0") + ":00";
+    if (!await hasOverlap(date, start, end)) {
+      await saveItem({
+        id: crypto.randomUUID(), date, start, end,
+        area: areas[Math.floor(Math.random() * areas.length)],
+        type: act.type, title: act.title, createdAt: Date.now()
+      });
+      added++;
+    }
+    currentHour = endHour;
   }
-  await renderList();
-  showToast("Schedule randomly populated!");
+  showMessage(`${added} random item${added !== 1 ? "s" : ""} added!`);
+  await renderForDate(date);
 }
 
-// ── Weather widget ─────────────────────────────────────────────────────────
+// ─── Event Listeners ──────────────────────────────────────────────────────────
 
-async function loadWeather(dateStr) {
-  const widget = document.getElementById("weatherWidget");
-  if (!dateStr) { widget.innerHTML = ""; return; }
+document.getElementById("btnAdd").addEventListener("click", addItem);
+document.getElementById("btnClear").addEventListener("click", () => { clearForm(); showMessage("Form cleared."); });
+document.getElementById("btnClearAll").addEventListener("click", async () => {
+  if (!confirm("Delete ALL schedule items?")) return;
+  for (const item of await getItems()) await removeItem(item.id);
+  showMessage("All items cleared.");
+  await renderForDate(viewDateEl.value || todayISO());
+});
+document.getElementById("btnRandom").addEventListener("click", randomPopulate);
 
-  // Open-Meteo is free and requires no API key
-  const today = new Date().toISOString().split("T")[0];
-  if (dateStr < today) { widget.innerHTML = ""; return; }
+viewDateEl.addEventListener("change", async () => {
+  dateEl.value = viewDateEl.value;
+  await renderForDate(viewDateEl.value);
+  renderWeather(weatherWidget, viewDateEl.value);
+});
 
-  try {
-    const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=49.2827&longitude=-123.1207` +
-      `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum` +
-      `&timezone=America%2FVancouver&start_date=${dateStr}&end_date=${dateStr}`
-    );
-    const data = await res.json();
-    if (!data.daily?.weathercode?.length) { widget.innerHTML = ""; return; }
+document.getElementById("btnRecs").addEventListener("click", async () => {
+  const date = viewDateEl.value || todayISO();
+  const ctx  = await getScheduleContext(date);
+  if (!ctx.totalItems) { showMessage("Add schedule items first!", false); return; }
+  const p = new URLSearchParams({ date, area: ctx.area, category: ctx.suggestedCategory, covered: ctx.coveredTypes.join(",") });
+  window.location.href = `recommendations.html?${p.toString()}`;
+});
 
-    const code  = data.daily.weathercode[0];
-    const tMax  = Math.round(data.daily.temperature_2m_max[0]);
-    const tMin  = Math.round(data.daily.temperature_2m_min[0]);
-    const rain  = data.daily.precipitation_sum[0];
+document.querySelectorAll("input[name='viewMode']").forEach(radio => {
+  radio.addEventListener("change", () => {
+    const isRange = radio.value === "range";
+    document.getElementById("singleDayPicker").style.display = isRange ? "none" : "flex";
+    document.getElementById("rangePicker").style.display     = isRange ? "flex" : "none";
+  });
+});
 
-    const icons = {
-      0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
-      45: "🌫️", 48: "🌫️",
-      51: "🌦️", 53: "🌦️", 55: "🌧️",
-      61: "🌧️", 63: "🌧️", 65: "🌧️",
-      71: "🌨️", 73: "🌨️", 75: "🌨️",
-      80: "🌦️", 81: "🌧️", 82: "⛈️",
-      95: "⛈️",
-    };
-    const icon = icons[code] ?? "🌡️";
+document.getElementById("btnApplyRange")?.addEventListener("click", async () => {
+  const start = document.getElementById("rangeStart").value;
+  const end   = document.getElementById("rangeEnd").value;
+  if (!start || !end || end < start) { showMessage("Pick a valid date range.", false); return; }
+  await renderForRange(start, end);
+});
 
-    widget.innerHTML = `
-      <div class="card shadow-sm">
-        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
-          <span style="font-size:2rem;">${icon}</span>
-          <div>
-            <strong>Vancouver Weather — ${formatDateLabel(dateStr)}</strong>
-            <div class="text-muted small">
-              High ${tMax}°C / Low ${tMin}°C · 
-              ${rain > 0 ? `${rain} mm precipitation` : "No precipitation expected"}
-            </div>
-          </div>
-        </div>
-      </div>`;
-  } catch {
-    widget.innerHTML = "";
-  }
-}
-
-// ── Init ───────────────────────────────────────────────────────────────────
+// ─── Auth State ───────────────────────────────────────────────────────────────
 
 onAuthStateChanged(auth, async (user) => {
   currentUser = user || null;
-  await renderList();
+  await renderForDate(viewDateEl.value || todayISO());
 });
 
-// Set today as default view date
-const today = new Date().toISOString().split("T")[0];
-document.getElementById("viewDate").value = today;
-loadWeather(today);
-renderList();
+// ─── Init ─────────────────────────────────────────────────────────────────────
 
-// View date change
-document.getElementById("viewDate").addEventListener("change", async (e) => {
-  await renderList();
-  loadWeather(e.target.value);
-});
-
-// Mode toggle
-document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
-  radio.addEventListener("change", () => {
-    const isSingle = radio.value === "single";
-    document.getElementById("singleDayPicker").style.display = isSingle ? "" : "none";
-    document.getElementById("rangePicker").style.display     = isSingle ? "none" : "";
-    if (!isSingle) loadWeather(""); // clear weather in range mode
-    renderList();
-  });
-});
-
-// Apply range
-document.getElementById("btnApplyRange").addEventListener("click", renderList);
-
-// Add
-document.getElementById("btnAdd").addEventListener("click", async () => {
-  const date      = document.getElementById("date").value;
-  const startTime = document.getElementById("startTime").value;
-  const endTime   = document.getElementById("endTime").value;
-  const area      = document.getElementById("area").value;
-  const type      = document.getElementById("type").value;
-  const title     = document.getElementById("title").value.trim();
-  if (!date || !title) { showToast("Date and title are required.", "bg-danger"); return; }
-  const item = { id: crypto.randomUUID(), date, startTime, endTime, area, type, title };
-  await saveItem(item);
-  document.getElementById("title").value = "";
-  await renderList();
-  showToast("Item added!");
-});
-
-// Clear form
-document.getElementById("btnClear").addEventListener("click", () => {
-  ["date","startTime","endTime","title"].forEach(id => {
-    document.getElementById(id).value = "";
-  });
-  document.getElementById("area").value = "Downtown";
-  document.getElementById("type").value = "Explore";
-});
-
-// Clear all
-document.getElementById("btnClearAll").addEventListener("click", async () => {
-  if (!confirm("Clear all schedule items?")) return;
-  await clearAll();
-  await renderList();
-  showToast("All items cleared.", "bg-secondary");
-});
-
-// Random populate
-document.getElementById("btnRandom").addEventListener("click", randomPopulate);
-
-// Get recommendations
-document.getElementById("btnRecs").addEventListener("click", () => {
-  const d = document.getElementById("viewDate").value;
-  window.location.href = `recommendations.html${d ? `?date=${d}` : ""}`;
-});
-
-// Back to top
-window.addEventListener("scroll", () => {
-  document.getElementById("backToTop").style.display =
-    window.scrollY > 300 ? "flex" : "none";
-});
-document.getElementById("backToTop").addEventListener("click", () => {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
+viewDateEl.value = todayISO();
+clearForm();
+renderForDate(viewDateEl.value);
+renderWeather(weatherWidget, viewDateEl.value);
