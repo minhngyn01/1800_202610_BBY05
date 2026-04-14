@@ -1,18 +1,19 @@
-/**
- * firebaseConfig.js
- *
- * Reads Firebase credentials from Vite environment variables (.env)
- * and exports a single config object used by all other modules.
- *
- * All variables must be prefixed with VITE_ in the .env file so Vite
- * exposes them to client-side code via import.meta.env.
- */
+// src/firebaseConfig.js
+// Shared Firebase app instance used across all pages.
 
-export const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGEBUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_SENDER_ID,
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+import { initializeApp }  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth }        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyDES1T6ePb5E0nzmocTic2xUyNLP0INJdI",
+  authDomain:        "fifa-itinerary.firebaseapp.com",
+  projectId:         "fifa-itinerary",
+  storageBucket:     "fifa-itinerary.firebasestorage.app",
+  messagingSenderId: "925526956776",
+  appId:             "1:925526956776:web:049b9a5885feda249d075d"
 };
+
+const app  = initializeApp(firebaseConfig);
+export const db   = getFirestore(app);
+export const auth = getAuth(app);
