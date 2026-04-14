@@ -1,68 +1,94 @@
-/**
- * authentication.js
- *
- * Handles login and signup via Firebase Auth.
- * On success, redirects to schedule.html.
- * Updates navbar auth button based on login state across the app.
- */
+// src/authentication.js
+// Handles login, signup, and logout on the login page.
+// Does NOT auto-redirect logged-in users — lets them log out instead.
 
+import { auth } from "/src/firebaseConfig.js";
 import {
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
+  signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-import { auth } from "./firebaseConfig.js";
+const emailEl          = document.getElementById("email");
+const passwordEl       = document.getElementById("password");
+const msgEl            = document.getElementById("msg");
+const btnLoginSubmit   = document.getElementById("btnLoginSubmit");
+const btnSignup        = document.getElementById("btnSignup");
+const btnLogoutPage    = document.getElementById("btnLogoutPage");
+const loggedInSection  = document.getElementById("loggedInSection");
+const loggedOutSection = document.getElementById("loggedOutSection");
+const loggedInEmail    = document.getElementById("loggedInEmail");
 
-const emailEl = document.getElementById("email");
-const passEl  = document.getElementById("password");
-const msgEl   = document.getElementById("msg");
+// Navbar elements (updated by navbar.js but also handled here for the login page)
+const navUserLabel = document.getElementById("navUserLabel");
+const btnLogoutNav = document.getElementById("btnLogout");
+const btnLoginNav  = document.getElementById("btnLogin");
 
-function setMsg(text, isError = true) {
+function showMsg(text, ok = false) {
+  if (!msgEl) return;
+  msgEl.className = ok ? "mt-3 text-success small" : "mt-3 text-danger small";
   msgEl.textContent = text;
-  msgEl.className   = `mt-3 mb-0 small ${isError ? "text-danger" : "text-success"}`;
 }
 
-// If already logged in, skip the login page
+// Show the right section based on auth state
+// NOTE: No auto-redirect — user stays on login page so they can log out
 onAuthStateChanged(auth, (user) => {
-  if (user) window.location.href = "schedule.html";
-});
+  if (user) {
+    // Show logged-in card
+    loggedInSection.style.display  = "block";
+    loggedOutSection.style.display = "none";
+    if (loggedInEmail) loggedInEmail.textContent = user.email;
 
-document.getElementById("btnLogin").addEventListener("click", async () => {
-  const email = emailEl.value.trim();
-  const pass  = passEl.value;
-  if (!email || !pass) { setMsg("Please enter your email and password."); return; }
-  try {
-    await signInWithEmailAndPassword(auth, email, pass);
-    // onAuthStateChanged will redirect
-  } catch (err) {
-    setMsg(friendlyError(err.code));
+    // Update navbar
+    if (navUserLabel) { navUserLabel.textContent = user.email; navUserLabel.style.display = "inline"; }
+    if (btnLogoutNav) btnLogoutNav.style.display = "inline-block";
+    if (btnLoginNav)  btnLoginNav.style.display  = "none";
+  } else {
+    // Show login form
+    loggedInSection.style.display  = "none";
+    loggedOutSection.style.display = "block";
+
+    // Update navbar
+    if (navUserLabel) navUserLabel.style.display = "none";
+    if (btnLogoutNav) btnLogoutNav.style.display = "none";
+    if (btnLoginNav)  btnLoginNav.style.display  = "inline-block";
   }
 });
 
-document.getElementById("btnSignup").addEventListener("click", async () => {
-  const email = emailEl.value.trim();
-  const pass  = passEl.value;
-  if (!email || !pass) { setMsg("Please enter an email and password."); return; }
-  if (pass.length < 6) { setMsg("Password must be at least 6 characters."); return; }
+// Log In
+btnLoginSubmit?.addEventListener("click", async () => {
+  const email    = emailEl.value.trim();
+  const password = passwordEl.value;
+  if (!email || !password) { showMsg("Please enter email and password."); return; }
   try {
-    await createUserWithEmailAndPassword(auth, email, pass);
-    setMsg("Account created! Redirecting…", false);
-    // onAuthStateChanged will redirect
-  } catch (err) {
-    setMsg(friendlyError(err.code));
+    await signInWithEmailAndPassword(auth, email, password);
+    window.location.href = "schedule.html"; // Redirect only after successful login
+  } catch (e) {
+    showMsg("Login failed: " + e.message);
   }
 });
 
-function friendlyError(code) {
-  const map = {
-    "auth/invalid-email":          "Invalid email address.",
-    "auth/user-not-found":         "No account found with that email.",
-    "auth/wrong-password":         "Incorrect password.",
-    "auth/email-already-in-use":   "An account with that email already exists.",
-    "auth/weak-password":          "Password must be at least 6 characters.",
-    "auth/too-many-requests":      "Too many attempts. Please try again later.",
-    "auth/invalid-credential":     "Invalid email or password.",
-  };
-  return map[code] || "Something went wrong. Please try again.";
-}
+// Sign Up
+btnSignup?.addEventListener("click", async () => {
+  const email    = emailEl.value.trim();
+  const password = passwordEl.value;
+  if (!email || !password) { showMsg("Please enter email and password."); return; }
+  try {
+    await createUserWithEmailAndPassword(auth, email, password);
+    window.location.href = "schedule.html"; // Redirect after registration
+  } catch (e) {
+    showMsg("Sign up failed: " + e.message);
+  }
+});
+
+// Log Out (button on the logged-in card)
+btnLogoutPage?.addEventListener("click", async () => {
+  await signOut(auth);
+  // onAuthStateChanged above will automatically swap sections back to logged-out
+});
+
+// Log Out (navbar button — also wired here since navbar.js may not be loaded on login page)
+btnLogoutNav?.addEventListener("click", async () => {
+  await signOut(auth);
+});
