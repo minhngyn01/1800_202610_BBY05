@@ -30,6 +30,53 @@ const BADGE = {
 
 let currentUser = null; // Set by onAuthStateChanged
 
+// ─── Pinned FIFA Match Items (read-only, never stored or deletable) ────────────
+
+const FIFA_MATCHES = [
+  {
+    id: "fifa-match-1",
+    date: "2026-06-13", start: "21:00", end: "23:00",
+    title: "⚽ Australia vs UEFA Playoff C Winner — Group D",
+    area: "Downtown", type: "Match", pinned: true
+  },
+  {
+    id: "fifa-match-2",
+    date: "2026-06-18", start: "12:00", end: "14:00",
+    title: "⚽ Canada vs Qatar — Group B",
+    area: "Downtown", type: "Match", pinned: true
+  },
+  {
+    id: "fifa-match-3",
+    date: "2026-06-21", start: "18:00", end: "20:00",
+    title: "⚽ New Zealand vs Egypt — Group G",
+    area: "Downtown", type: "Match", pinned: true
+  },
+  {
+    id: "fifa-match-4",
+    date: "2026-06-24", start: "12:00", end: "14:00",
+    title: "⚽ Switzerland vs Canada — Group B",
+    area: "Downtown", type: "Match", pinned: true
+  },
+  {
+    id: "fifa-match-5",
+    date: "2026-06-26", start: "19:00", end: "21:00",
+    title: "⚽ New Zealand vs Belgium — Group G",
+    area: "Downtown", type: "Match", pinned: true
+  },
+  {
+    id: "fifa-match-6",
+    date: "2026-07-02", start: "19:00", end: "21:00",
+    title: "⚽ Round of 32 — TBD vs TBD",
+    area: "Downtown", type: "Match", pinned: true
+  },
+  {
+    id: "fifa-match-7",
+    date: "2026-07-07", start: "16:00", end: "18:00",
+    title: "⚽ Round of 16 — TBD vs TBD",
+    area: "Downtown", type: "Match", pinned: true
+  },
+];
+
 // ─── Storage Helpers ──────────────────────────────────────────────────────────
 // Logged in → Firestore | Guest → localStorage
 
@@ -90,9 +137,10 @@ function validate() {
 }
 
 async function hasOverlap(date, start, end, excludeId = null) {
-  const items = await getItems();
+  const userItems = await getItems();
+  const allItems = [...userItems, ...FIFA_MATCHES];
   const ns = toMins(start), ne = toMins(end);
-  return items.some(item =>
+  return allItems.some(item =>
     item.date === date && item.id !== excludeId &&
     ns < toMins(item.end) && ne > toMins(item.start)
   );
@@ -141,16 +189,64 @@ async function saveEdit(id) {
   await renderForDate(viewDateEl.value || todayISO());
 }
 
+// ─── Render Helpers ───────────────────────────────────────────────────────────
+
+function renderPinnedCard(item) {
+  const clone  = document.getElementById("tmpl-pinned-match").content.cloneNode(true);
+  const colDiv = clone.querySelector(".col-12");
+  colDiv.dataset.id = item.id;
+  clone.querySelector(".t-title").textContent = item.title;
+  clone.querySelector(".t-meta").textContent  = `${item.date} • ${item.start}–${item.end} • BC Place, Downtown`;
+  return clone;
+}
+
+function renderUserCard(item) {
+  const clone  = tmplItem.content.cloneNode(true);
+  const colDiv = clone.querySelector(".col-12");
+  colDiv.dataset.id = item.id;
+
+  clone.querySelector(".t-badge").className  += ` ${BADGE[item.type] || "text-bg-secondary"}`;
+  clone.querySelector(".t-badge").textContent = item.type;
+  clone.querySelector(".t-title").textContent = item.title;
+  clone.querySelector(".t-meta").textContent  = `${item.date} • ${item.start}–${item.end} • ${item.area}`;
+
+  clone.querySelector(".t-edit-date").value  = item.date;
+  clone.querySelector(".t-edit-start").value = item.start;
+  clone.querySelector(".t-edit-end").value   = item.end;
+  clone.querySelector(".t-edit-area").value  = item.area;
+  clone.querySelector(".t-edit-type").value  = item.type;
+  clone.querySelector(".t-edit-title").value = item.title;
+
+  const viewDiv  = clone.querySelector(".t-view");
+  const editForm = clone.querySelector(".t-edit-form");
+
+  clone.querySelector(".t-edit").addEventListener("click", () => {
+    viewDiv.style.display = "none";
+    editForm.style.display = "block";
+  });
+  clone.querySelector(".t-cancel").addEventListener("click", () => {
+    viewDiv.style.display = "flex";
+    editForm.style.display = "none";
+  });
+  clone.querySelector(".t-save").addEventListener("click",   () => saveEdit(item.id));
+  clone.querySelector(".t-delete").addEventListener("click", () => deleteItem(item.id));
+  return clone;
+}
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 async function renderForDate(date) {
-  const items = (await getItems())
+  const userItems = (await getItems())
     .filter(item => item.date === date)
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  const pinnedItems = FIFA_MATCHES
+    .filter(m => m.date === date)
     .sort((a, b) => a.start.localeCompare(b.start));
 
   scheduleList.innerHTML = "";
 
-  if (!date || !items.length) {
+  if (!date || (!userItems.length && !pinnedItems.length)) {
     const clone = tmplEmpty.content.cloneNode(true);
     const msgEl = clone.querySelector(".t-msg");
     msgEl.classList.add(!date ? "alert-secondary" : "alert-info");
@@ -159,45 +255,29 @@ async function renderForDate(date) {
     return;
   }
 
-  for (const item of items) {
-    const clone  = tmplItem.content.cloneNode(true);
-    const colDiv = clone.querySelector(".col-12");
-    colDiv.dataset.id = item.id;
+  const allItems = [
+    ...pinnedItems.map(i => ({ ...i, _pinned: true })),
+    ...userItems.map(i => ({ ...i, _pinned: false })),
+  ].sort((a, b) => a.start.localeCompare(b.start));
 
-    clone.querySelector(".t-badge").className  += ` ${BADGE[item.type] || "text-bg-secondary"}`;
-    clone.querySelector(".t-badge").textContent = item.type;
-    clone.querySelector(".t-title").textContent = item.title;
-    clone.querySelector(".t-meta").textContent  = `${item.date} • ${item.start}–${item.end} • ${item.area}`;
-
-    // Pre-fill edit form fields
-    clone.querySelector(".t-edit-date").value  = item.date;
-    clone.querySelector(".t-edit-start").value = item.start;
-    clone.querySelector(".t-edit-end").value   = item.end;
-    clone.querySelector(".t-edit-area").value  = item.area;
-    clone.querySelector(".t-edit-type").value  = item.type;
-    clone.querySelector(".t-edit-title").value = item.title;
-
-    const viewDiv  = clone.querySelector(".t-view");
-    const editForm = clone.querySelector(".t-edit-form");
-
-    clone.querySelector(".t-edit").addEventListener("click", () => {
-      viewDiv.style.display = "none";
-      editForm.style.display = "block";
-    });
-    clone.querySelector(".t-cancel").addEventListener("click", () => {
-      viewDiv.style.display = "flex";
-      editForm.style.display = "none";
-    });
-    clone.querySelector(".t-save").addEventListener("click",   () => saveEdit(item.id));
-    clone.querySelector(".t-delete").addEventListener("click", () => deleteItem(item.id));
-    scheduleList.appendChild(clone);
+  for (const item of allItems) {
+    scheduleList.appendChild(item._pinned ? renderPinnedCard(item) : renderUserCard(item));
   }
 }
 
 async function renderForRange(startDate, endDate) {
-  const allItems = (await getItems())
+  const userItems = (await getItems())
     .filter(item => item.date >= startDate && item.date <= endDate)
     .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+
+  const pinnedItems = FIFA_MATCHES
+    .filter(m => m.date >= startDate && m.date <= endDate)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
+
+  const allItems = [
+    ...pinnedItems.map(i => ({ ...i, _pinned: true })),
+    ...userItems.map(i => ({ ...i, _pinned: false })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start));
 
   scheduleList.innerHTML = "";
 
@@ -220,15 +300,19 @@ async function renderForRange(startDate, endDate) {
       scheduleList.appendChild(header);
       lastDate = item.date;
     }
-    const clone  = tmplItem.content.cloneNode(true);
-    const colDiv = clone.querySelector(".col-12");
-    colDiv.dataset.id = item.id;
-    clone.querySelector(".t-badge").className  += ` ${BADGE[item.type] || "text-bg-secondary"}`;
-    clone.querySelector(".t-badge").textContent = item.type;
-    clone.querySelector(".t-title").textContent = item.title;
-    clone.querySelector(".t-meta").textContent  = `${item.date} • ${item.start}–${item.end} • ${item.area}`;
-    clone.querySelector(".t-delete").addEventListener("click", () => deleteItem(item.id));
-    scheduleList.appendChild(clone);
+    if (item._pinned) {
+      scheduleList.appendChild(renderPinnedCard(item));
+    } else {
+      const clone  = tmplItem.content.cloneNode(true);
+      const colDiv = clone.querySelector(".col-12");
+      colDiv.dataset.id = item.id;
+      clone.querySelector(".t-badge").className  += ` ${BADGE[item.type] || "text-bg-secondary"}`;
+      clone.querySelector(".t-badge").textContent = item.type;
+      clone.querySelector(".t-title").textContent = item.title;
+      clone.querySelector(".t-meta").textContent  = `${item.date} • ${item.start}–${item.end} • ${item.area}`;
+      clone.querySelector(".t-delete").addEventListener("click", () => deleteItem(item.id));
+      scheduleList.appendChild(clone);
+    }
   }
 }
 
@@ -249,28 +333,42 @@ async function getScheduleContext(date) {
 // ─── Random Populate ──────────────────────────────────────────────────────────
 
 async function randomPopulate() {
+  // earliestHour = earliest the activity can START
+  // latestHour   = latest the activity can START
+  // dur          = fixed duration in hours
   const activities = [
-    { title: "Visit Stanley Park",          type: "Explore" },
-    { title: "Explore Granville Island",    type: "Explore" },
-    { title: "Walk the Seawall",            type: "Explore" },
-    { title: "Visit Vancouver Art Gallery", type: "Explore" },
-    { title: "Lunch Downtown",              type: "Eat"     },
-    { title: "Coffee Break",               type: "Eat"     },
-    { title: "Dinner Downtown",             type: "Eat"     },
-    { title: "Watch World Cup Match",       type: "Match"   },
-    { title: "SkyTrain Ride",              type: "Travel"  },
+    
+    { title: "Morning Walk",          type: "Explore", earliestHour: 6,  latestHour: 9,  dur: 1 },
+    { title: "Breakfast",             type: "Eat",     earliestHour: 7,  latestHour: 10, dur: 1 },
+    { title: "Transit",               type: "Travel",  earliestHour: 8,  latestHour: 20, dur: 1 },
+    { title: "Coffee Break",          type: "Eat",     earliestHour: 9,  latestHour: 16, dur: 1 },
+    { title: "Visit Local Market",    type: "Explore", earliestHour: 9,  latestHour: 15, dur: 2 },
+    { title: "Sightseeing",           type: "Explore", earliestHour: 9,  latestHour: 17, dur: 2 },
+    { title: "Museum Visit",          type: "Explore", earliestHour: 10, latestHour: 16, dur: 2 },
+    { title: "Lunch",                 type: "Eat",     earliestHour: 11, latestHour: 14, dur: 1 },
+    { title: "Explore Neighbourhood", type: "Explore", earliestHour: 11, latestHour: 18, dur: 2 },
+    
+    { title: "Dinner",                type: "Eat",     earliestHour: 17, latestHour: 20, dur: 2 },
   ];
+
   const areas = ["Downtown", "Kitsilano", "UBC", "North Vancouver", "Richmond"];
   const date  = viewDateEl.value || todayISO();
-  let currentHour = 9, added = 0;
+  let added   = 0;
 
-  for (const act of [...activities].sort(() => Math.random() - 0.5)) {
+  // Assign each activity a random start within its window, then sort chronologically
+  // so the generated day flows in a natural order.
+  const candidates = activities
+    .map(act => {
+      const startHour = act.earliestHour + Math.floor(Math.random() * (act.latestHour - act.earliestHour + 1));
+      return { ...act, startHour, endHour: startHour + act.dur };
+    })
+    .filter(act => act.endHour <= 23)
+    .sort((a, b) => a.startHour - b.startHour);
+
+  for (const act of candidates) {
     if (added >= 5) break;
-    const dur     = Math.floor(Math.random() * 2) + 1;
-    const endHour = currentHour + dur;
-    if (endHour > 23) break;
-    const start = String(currentHour).padStart(2, "0") + ":00";
-    const end   = String(endHour).padStart(2, "0") + ":00";
+    const start = String(act.startHour).padStart(2, "0") + ":00";
+    const end   = String(act.endHour).padStart(2, "0")   + ":00";
     if (!await hasOverlap(date, start, end)) {
       await saveItem({
         id: crypto.randomUUID(), date, start, end,
@@ -279,8 +377,8 @@ async function randomPopulate() {
       });
       added++;
     }
-    currentHour = endHour;
   }
+
   showMessage(`${added} random item${added !== 1 ? "s" : ""} added!`);
   await renderForDate(date);
 }
@@ -325,6 +423,14 @@ document.getElementById("btnApplyRange")?.addEventListener("click", async () => 
   if (!start || !end || end < start) { showMessage("Pick a valid date range.", false); return; }
   await renderForRange(start, end);
 });
+
+const backToTop = document.getElementById("backToTop");
+if (backToTop) {
+  window.addEventListener("scroll", () => {
+    backToTop.style.display = window.scrollY > 300 ? "flex" : "none";
+  });
+  backToTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+}
 
 // ─── Auth State ───────────────────────────────────────────────────────────────
 
