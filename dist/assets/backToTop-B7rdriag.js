@@ -1,0 +1,1 @@
+const e=document.getElementById("backToTop");window.addEventListener("scroll",()=>{e.style.display=window.scrollY>300?"flex":"none"});e.style.alignItems="center";e.style.justifyContent="center";e.addEventListener("click",()=>{window.scrollTo({top:0,behavior:"smooth"})});
