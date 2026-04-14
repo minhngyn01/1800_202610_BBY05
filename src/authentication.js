@@ -6,18 +6,13 @@
  * Updates navbar auth button based on login state across the app.
  */
 
-import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
-  signOut,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { firebaseConfig } from "./firebaseConfig.js";
 
-const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+import { auth } from "./firebaseConfig.js";
 
 const emailEl = document.getElementById("email");
 const passEl  = document.getElementById("password");

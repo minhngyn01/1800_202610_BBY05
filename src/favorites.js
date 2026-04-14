@@ -9,69 +9,126 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/f
 
 const ALL_RECS = [
   {
-    id: "stanley-park", type: "Explore", name: "Stanley Park", area: "Downtown",
+    id: "stanley-park", 
+    type: "Explore", 
+    name: "Stanley Park", 
+    area: "Downtown",
     desc: "Seawall, beaches, forest trails, scenic views.",
-    tags: ["park", "seawall", "views", "nature"], img: "images/stanleypark.jpg"
+    tags: ["park", "seawall", "views", "nature"], 
+    img: "images/stanleypark.jpg"
   },
   {
-    id: "granville-island", type: "Explore", name: "Granville Island Public Market", area: "Kitsilano",
+    id: "granville-island", 
+    type: "Explore", 
+    name: "Granville Island Public Market", 
+    area: "Kitsilano",
     desc: "Public market, shops, and food stalls.",
-    tags: ["market", "food", "shops"], img: "images/gran.jpg"
+    tags: ["market", "food", "shops"], 
+    img: "images/gran.jpg"
   },
   {
-    id: "science-world", type: "Explore", name: "Science World", area: "Downtown",
+    id: "science-world", 
+    type: "Explore", 
+    name: "Science World", 
+    area: "Downtown",
     desc: "Interactive science exhibits and shows.",
-    tags: ["museum", "family", "indoor"], img: "images/scienceworld.jpg"
+    tags: ["museum", "family", "indoor"], 
+    img: "images/scienceworld.jpg"
   },
   {
-    id: "vandusen", type: "Explore", name: "VanDusen Botanical Garden", area: "Kitsilano",
+    id: "vandusen", 
+    type: "Explore", 
+    name: "VanDusen Botanical Garden", 
+    area: "Kitsilano",
     desc: "Large botanical garden with seasonal displays.",
-    tags: ["garden", "nature", "photos"], img: "images/vangarden.jpg"
+    tags: ["garden", "nature", "photos"], 
+    img: "images/vangarden.jpg"
   },
   {
-    id: "moa", type: "Explore", name: "Museum of Anthropology (MOA)", area: "UBC",
+    id: "moa", 
+    type: "Explore", 
+    name: "Museum of Anthropology (MOA)", 
+    area: "UBC",
     desc: "Iconic museum focused on world arts and cultures.",
-    tags: ["museum", "culture", "ubc"], img: "images/museum.jpg"
+    tags: ["museum", "culture", "ubc"], 
+    img: "images/museum.jpg"
   },
   {
-    id: "grouse-mountain", type: "Explore", name: "Grouse Mountain", area: "North Vancouver",
+    id: "grouse-mountain", 
+    type: "Explore", 
+    name: "Grouse Mountain", 
+    area: "North Vancouver",
     desc: "Mountain views and outdoor activities.",
-    tags: ["mountain", "views", "hike"], img: "images/grouse.jpg"
+    tags: ["mountain", "views", "hike"], 
+    img: "images/grouse.jpg"
   },
   {
-    id: "capilano", type: "Explore", name: "Capilano Suspension Bridge", area: "North Vancouver",
+    id: "capilano", 
+    type: "Explore", 
+    name: "Capilano Suspension Bridge", 
+    area: "North Vancouver",
     desc: "Suspension bridge and treetop walk.",
-    tags: ["bridge", "views", "forest"], img: "images/capilano.jpg"
+    tags: ["bridge", "views", "forest"], 
+    img: "images/capilano.jpg"
   },
   {
-    id: "steveston", type: "Explore", name: "Steveston Village (Richmond)", area: "Richmond",
+    id: "steveston", 
+    type: "Explore", 
+    name: "Steveston Village (Richmond)", 
+    area: "Richmond",
     desc: "Fishing village vibes and waterfront stroll.",
-    tags: ["village", "seafood", "waterfront"], img: "images/steveston.jpg"
+    tags: ["village", "seafood", "waterfront"], 
+    img: "images/steveston.jpg"
   },
   {
-    id: "miku", type: "Eat", name: "Miku Restaurant", area: "Downtown",
+    id: "miku", 
+    type: "Eat", 
+    name: "Miku Restaurant", 
+    area: "Downtown",
     desc: "Popular for sushi/oshi style and waterfront dining.",
-    tags: ["sushi", "japanese", "seafood"], vegetarian: true, img: "images/miku.jpg"
+    tags: ["sushi", "japanese", "seafood"], 
+    vegetarian: true, 
+    img: "images/miku.jpg"
   },
   {
-    id: "blue-water", type: "Eat", name: "Blue Water Cafe", area: "Downtown",
+    id: "blue-water", 
+    type: "Eat", 
+    name: "Blue Water Cafe", 
+    area: "Downtown",
     desc: "Well-known seafood spot in Yaletown.",
-    tags: ["seafood", "yaletown"], vegetarian: false, img: "images/bluecafe.jpg"
+    tags: ["seafood", "yaletown"], 
+    vegetarian: false, 
+    img: "images/bluecafe.jpg"
   },
   {
-    id: "elisa", type: "Eat", name: "Elisa Steakhouse", area: "Downtown",
+    id: "elisa", 
+    type: "Eat", 
+    name: "Elisa Steakhouse", 
+    area: "Downtown",
     desc: "Modern steakhouse in Yaletown.",
-    tags: ["steak", "yaletown"], vegetarian: false, img: "images/elisasteak.jpg"
+    tags: ["steak", "yaletown"], 
+    vegetarian: false, 
+    img: "images/elisasteak.jpg"
   },
   {
-    id: "raminami", type: "Eat", name: "Minami Restaurant", area: "Downtown",
+    id: "raminami", 
+    type: "Eat", 
+    name: "Minami Restaurant", 
+    area: "Downtown",
     desc: "Japanese dining in Yaletown.",
-    tags: ["japanese", "sushi", "yaletown"], vegetarian: true, img: "images/minami.jpg"
+    tags: ["japanese", "sushi", "yaletown"], 
+    vegetarian: true, 
+    img: "images/minami.jpg"
   },
   {
-    id: "ramen-danbo", type: "Eat", name: "Ramen Danbo (Robson)", area: "Downtown",
+    id: "ramen-danbo", 
+    type: "Eat", 
+    name: "Ramen Danbo (Robson)", 
+    area: "Downtown",
     desc: "Top rated ramen place.",
-    tags: ["ramen", "japanese"], vegetarian: true, img: "images/ramen.jpg"
+    tags: ["ramen", "japanese"], 
+    vegetarian: true, 
+    img: "images/ramen.jpg"
   },
 ];
 

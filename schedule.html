@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <title>Schedule - FIFA Itinerary</title>
   <meta charset="utf-8">
@@ -10,11 +11,13 @@
   <style>
     .pinned-match-card {
       border: 2px solid #ffc107 !important;
-      background: linear-gradient(135deg, rgba(255,193,7,0.08) 0%, rgba(13,110,253,0.06) 100%);
+      background: linear-gradient(135deg, rgba(255, 193, 7, 0.08) 0%, rgba(13, 110, 253, 0.06) 100%);
     }
+
     [data-bs-theme="dark"] .pinned-match-card {
-      background: linear-gradient(135deg, rgba(255,193,7,0.12) 0%, rgba(13,110,253,0.10) 100%);
+      background: linear-gradient(135deg, rgba(255, 193, 7, 0.12) 0%, rgba(13, 110, 253, 0.10) 100%);
     }
+
     .pinned-match-card .pinned-label {
       font-size: 0.7rem;
       letter-spacing: 0.05em;
@@ -22,28 +25,31 @@
     }
   </style>
 </head>
+
 <body>
 
   <!-- NAVBAR -->
-<nav class="navbar navbar-expand-lg bg-body-tertiary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="index.html">Itinerary</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-      aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
-        <li class="nav-item"><a class="nav-link active" aria-current="page" href="schedule.html">Schedule</a></li>
-        <li class="nav-item"><a class="nav-link"href="recommendations.html">Recommendations</a></li>
-        <li class="nav-item"><a class="nav-link" href="favorites.html">Favorites</a></li>
-      </ul>
-      <button id="btnDarkMode" class="btn btn-outline-secondary btn-sm me-2">🌙</button>
-      <a href="login.html" class="btn btn-outline-success" id="navAuthBtn">Login</a>
+  <nav class="navbar navbar-expand-lg bg-body-tertiary">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="index.html">Itinerary</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+          <li class="nav-item"><a class="nav-link active" aria-current="page" href="schedule.html">Schedule</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="recommendations.html">Recommendations</a>
+          </li>
+          <li class="nav-item"><a class="nav-link" href="favorites.html">Favorites</a></li>
+        </ul>
+        <button id="btnDarkMode" class="btn btn-outline-secondary btn-sm me-2">🌙</button>
+        <a href="login.html" class="btn btn-outline-success" id="navAuthBtn">Login</a>
+      </div>
     </div>
-  </div>
-</nav>
+  </nav>
 
   <!-- HERO -->
   <div class="p-5 mb-4 bg-body-tertiary rounded-3">
@@ -98,7 +104,8 @@
           </div>
           <div class="col-12">
             <label class="form-label">Title</label>
-            <input id="title" class="form-control" placeholder="e.g., Visit Stanley Park, Dinner with friends, Watch match">
+            <input id="title" class="form-control"
+              placeholder="e.g., Visit Stanley Park, Dinner with friends, Watch match">
           </div>
           <div class="col-12 d-flex gap-2 flex-wrap">
             <button id="btnAdd" class="btn btn-primary" type="button">Add to Schedule</button>
@@ -153,11 +160,11 @@
   </div>
 
   <!-- FOOTER -->
-<footer class="border-top py-3">
-  <div class="container d-flex justify-content-center align-items-center gap-4">
-    <p class="mb-0 text-muted">&copy; 2026 FIFA Itinerary Planner</p>
-  </div>
-</footer>
+  <footer class="border-top py-3">
+    <div class="container d-flex justify-content-center align-items-center gap-4">
+      <p class="mb-0 text-muted">&copy; 2026 FIFA Itinerary Planner</p>
+    </div>
+  </footer>
 
   <!-- Template: pinned FIFA match card (read-only) -->
   <template id="tmpl-pinned-match">
@@ -281,4 +288,5 @@
   <script type="module" src="/src/darkMode.js"></script>
   <script type="module" src="/src/schedulePlanner.js"></script>
 </body>
+
 </html>
